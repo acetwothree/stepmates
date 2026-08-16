@@ -8,7 +8,9 @@ on:
 jobs:
   build-and-deploy:
     name: Build, Archive & Upload to TestFlight
-    runs-on: macos-14
+    # "latest" tracks GitHub's current macOS runner image so this stays current as Apple
+    # ships new Xcode/SDK versions, instead of pinning a label that may fall behind.
+    runs-on: macos-latest
     timeout-minutes: 60
 
     env:
@@ -24,10 +26,12 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          # "latest-stable" avoids pinning to a patch version that may not exist on a given
-          # runner image. Once your pipeline is green, pin an exact version (e.g. "16.2")
-          # for reproducibility.
-          xcode-version: latest-stable
+          # Pinned to the major version whose SDK App Store Connect currently requires.
+          # "latest-stable" silently falls back to whatever's newest *on that runner*, which
+          # is exactly how this ended up building against the iOS 18.2 SDK (Xcode 16.2) and
+          # failing validation — an explicit version fails loudly instead if it's ever
+          # unavailable. Bump this number as Apple's minimum-SDK requirement moves forward.
+          xcode-version: "26"
 
       - name: Install XcodeGen
         run: brew install xcodegen
