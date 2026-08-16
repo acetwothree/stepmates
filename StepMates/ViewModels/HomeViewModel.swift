@@ -119,7 +119,8 @@ final class HomeViewModel {
                 distance: healthKitManager.todayDistanceMeters,
                 activeCalories: healthKitManager.todayActiveCalories,
                 flightsClimbed: healthKitManager.todayFlightsClimbed,
-                activeMinutes: healthKitManager.todayActiveMinutes
+                activeMinutes: healthKitManager.todayActiveMinutes,
+                goal: updatedDay.goal
             )
         )
     }
@@ -229,6 +230,69 @@ final class HomeViewModel {
         hasOfferedRecapThisSession = true
         if calendar.component(.weekday, from: now) == 1 {
             showWeeklyRecap = true
+            Task { await refreshWeeklyRecap() }
         }
+    }
+
+    /// Pulls the trailing 7 days of real `DailyResultRecord`s and turns them into a genuine
+    /// win/loss record and combined steps. Outstanding IOUs apply the *current* active wager's
+    /// stakes across however many days each side lost this week — there's no per-day wager
+    /// history, so a wager that changed mid-week would misattribute a couple of days' stakes.
+    /// Days missing a record for either side (not paired yet that day, or a sync gap) are
+    /// simply skipped rather than backfilled with a fabricated value.
+    func refreshWeeklyRecap() async {
+        guard let myRole = cloudKitSyncEngine.role else { return }
+        let results = await cloudKitSyncEngine.fetchWeeklyResults()
+        guard !results.isEmpty else { return }
+
+        let calendar = Calendar.current
+        let byDay = Dictionary(grouping: results) { calendar.startOfDay(for: $0.date) }
+
+        var currentUserWins = 0
+        var partnerWins = 0
+        var ties = 0
+        var currentUserTotal = 0
+        var partnerTotal = 0
+        var currentUserLossDays = 0
+        var partnerLossDays = 0
+
+        for dayResults in byDay.values {
+            guard let mine = dayResults.first(where: { $0.role == myRole }),
+                  let theirs = dayResults.first(where: { $0.role != myRole }) else { continue }
+
+            currentUserTotal += mine.stepCount
+            partnerTotal += theirs.stepCount
+
+            if mine.stepCount == theirs.stepCount {
+                ties += 1
+            } else if mine.stepCount > theirs.stepCount {
+                currentUserWins += 1
+                partnerLossDays += 1
+            } else {
+                partnerWins += 1
+                currentUserLossDays += 1
+            }
+        }
+
+        var outstandingIOUs: [IOUDebt] = []
+        if let wager = activeWager, wager.mode == .versusSprint {
+            if currentUserLossDays > 0, let stake = wager.stakeForCurrentUser?.stakeDescription {
+                let suffix = currentUserLossDays > 1 ? " ×\(currentUserLossDays)" : ""
+                outstandingIOUs.append(IOUDebt(owedByCurrentUser: true, description: "\(stake)\(suffix)"))
+            }
+            if partnerLossDays > 0, let stake = wager.stakeForPartner?.stakeDescription {
+                let suffix = partnerLossDays > 1 ? " ×\(partnerLossDays)" : ""
+                outstandingIOUs.append(IOUDebt(owedByCurrentUser: false, description: "\(stake)\(suffix)"))
+            }
+        }
+
+        weeklyRecap = WeeklyRecap(
+            currentUserWins: currentUserWins,
+            partnerWins: partnerWins,
+            ties: ties,
+            currentUserTotalSteps: currentUserTotal,
+            partnerTotalSteps: partnerTotal,
+            outstandingIOUs: outstandingIOUs
+        )
     }
 }

@@ -24,6 +24,7 @@ struct StepPushPayload: Sendable {
     var activeCalories: Double
     var flightsClimbed: Int
     var activeMinutes: Int
+    var goal: Int
 }
 
 /// Owns every CloudKit interaction: room creation, sharing, the passive step push, and the
@@ -273,6 +274,10 @@ final class CloudKitSyncEngine {
             offlineStepQueue = nil
             isOffline = false
             lastSyncedAt = .now
+
+            // Best-effort: today's sealed daily-result entry, the one piece of real history
+            // a genuine weekly recap needs. Failure here shouldn't fail the step push itself.
+            await upsertTodayResult(steps: payload.steps, goal: payload.goal)
         } catch let error as CKError where error.code == .networkUnavailable || error.code == .networkFailure {
             isOffline = true
             offlineStepQueue = payload
@@ -280,6 +285,70 @@ final class CloudKitSyncEngine {
         } catch {
             handle(error)
             throw error
+        }
+    }
+
+    /// Writes (or overwrites) today's `DailyResultRecord` for this device's role. Called on
+    /// every successful step push, so "today's" record stays live all day and simply becomes
+    /// history once the calendar date rolls over and a new record starts getting touched.
+    private func upsertTodayResult(steps: Int, goal: Int, date: Date = .now) async {
+        guard let zoneID, let role else { return }
+        do {
+            let recordID = dailyResultRecordID(role: role, date: date, zoneID: zoneID)
+            let record: CKRecord
+            if let existing = try? await activeDatabase.record(for: recordID) {
+                record = existing
+            } else {
+                record = CKRecord(recordType: RecordType.dailyResult, recordID: recordID)
+                record[DailyResultField.role] = role.rawValue as CKRecordValue
+                record[DailyResultField.date] = Calendar.current.startOfDay(for: date) as CKRecordValue
+            }
+            record[DailyResultField.stepCount] = steps as CKRecordValue
+            record[DailyResultField.goal] = goal as CKRecordValue
+            _ = try await activeDatabase.save(record)
+        } catch {
+            // Non-fatal — the recap just won't have today's entry until the next successful push.
+        }
+    }
+
+    private func dailyResultRecordID(role: PairingRole, date: Date, zoneID: CKRecordZone.ID) -> CKRecord.ID {
+        CKRecord.ID(recordName: "Result-\(role.rawValue)-\(Self.dayKeyFormatter.string(from: date))", zoneID: zoneID)
+    }
+
+    private static let dayKeyFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    /// Fetches every `DailyResultRecord` for both roles over the trailing `days` calendar
+    /// days (including today) — the real data source behind the weekly recap. Days with no
+    /// record for a given role (they weren't paired yet, or hadn't synced that day) are
+    /// simply absent from the result rather than backfilled with a fabricated zero.
+    func fetchWeeklyResults(days: Int = 7) async -> [DailyResult] {
+        guard let zoneID, pairingState == .paired else { return [] }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+
+        var recordIDs: [CKRecord.ID] = []
+        for offset in 0..<days {
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
+            for role in [PairingRole.owner, .partner] {
+                recordIDs.append(dailyResultRecordID(role: role, date: day, zoneID: zoneID))
+            }
+        }
+        guard !recordIDs.isEmpty else { return [] }
+
+        do {
+            let results = try await activeDatabase.records(for: recordIDs)
+            return results.values.compactMap { result in
+                guard case .success(let record) = result else { return nil }
+                return DailyResult(record: record)
+            }
+        } catch {
+            handle(error)
+            return []
         }
     }
 
@@ -574,6 +643,7 @@ final class CloudKitSyncEngine {
 private enum RecordType {
     static let room = "RoomRecord"
     static let memberState = "MemberStateRecord"
+    static let dailyResult = "DailyResultRecord"
 }
 
 private enum RoomField {
@@ -595,6 +665,25 @@ private enum MemberField {
     static let todayActiveMinutes = "todayActiveMinutes"
     static let lastSyncedAt = "lastSyncedAt"
     static let lastNudgeTimestamp = "lastNudgeTimestamp"
+}
+
+private enum DailyResultField {
+    static let role = "role"
+    static let date = "date"
+    static let stepCount = "stepCount"
+    static let goal = "goal"
+}
+
+private extension DailyResult {
+    init?(record: CKRecord) {
+        guard let roleRaw = record[DailyResultField.role] as? String,
+              let role = PairingRole(rawValue: roleRaw),
+              let date = record[DailyResultField.date] as? Date else { return nil }
+        self.role = role
+        self.date = date
+        stepCount = record[DailyResultField.stepCount] as? Int ?? 0
+        goal = record[DailyResultField.goal] as? Int ?? 0
+    }
 }
 
 private extension RoomSnapshot {

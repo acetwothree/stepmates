@@ -39,6 +39,19 @@ struct RoomSnapshot: Equatable, Sendable {
 
 /// Mirrors a `MemberStateRecord` — either the current user's own state or their partner's,
 /// depending on which slot it was read from.
+/// One side's sealed daily total — mirrors a `DailyResultRecord`. Unlike `MemberSnapshot`
+/// (which only ever reflects "today," overwritten continuously), a `DailyResult` exists once
+/// per role per calendar day and is never overwritten once that day has passed, which is what
+/// makes a genuine weekly recap possible.
+struct DailyResult: Equatable, Sendable {
+    var role: PairingRole
+    var date: Date
+    var stepCount: Int
+    var goal: Int
+
+    var hasHitGoal: Bool { goal > 0 && stepCount >= goal }
+}
+
 struct MemberSnapshot: Equatable, Sendable {
     var userRecordID: String
     var displayName: String
