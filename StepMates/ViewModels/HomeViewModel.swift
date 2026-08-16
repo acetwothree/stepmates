@@ -76,9 +76,13 @@ final class HomeViewModel {
             _ = healthKitManager.todaySteps
             _ = healthKitManager.todayHourlyTrend
         } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                self?.syncStepsFromHealthKit()
-                self?.observeHealthKitChanges()
+            // Resolve self once here rather than re-declaring [weak self] on the nested
+            // Task — doing so trips Swift 6's region-based "task or actor isolated value
+            // cannot be sent" check on the resulting weak optional.
+            guard let self else { return }
+            Task { @MainActor in
+                self.syncStepsFromHealthKit()
+                self.observeHealthKitChanges()
             }
         }
     }
@@ -121,9 +125,10 @@ final class HomeViewModel {
             _ = cloudKitSyncEngine.mySnapshot
             _ = cloudKitSyncEngine.pairingState
         } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                self?.syncFromCloudKit()
-                self?.observeCloudKitChanges()
+            guard let self else { return }
+            Task { @MainActor in
+                self.syncFromCloudKit()
+                self.observeCloudKitChanges()
             }
         }
     }

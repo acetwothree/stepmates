@@ -253,8 +253,15 @@ final class HealthKitManager {
                 completionHandler()
                 return
             }
-            Task { @MainActor [weak self] in
-                await self?.handleObserverUpdate(completionHandler: completionHandler)
+            // Resolve self once here rather than re-declaring [weak self] on the nested
+            // Task — see the comment in handleObserverUpdate for why that trips Swift 6's
+            // region-based "task or actor isolated value cannot be sent" check.
+            guard let self else {
+                completionHandler()
+                return
+            }
+            Task { @MainActor in
+                await self.handleObserverUpdate(completionHandler: completionHandler)
             }
         }
 
@@ -301,10 +308,11 @@ final class HealthKitManager {
     private func enableBackgroundDeliveryIfNeeded() {
         guard !isBackgroundDeliveryEnabled else { return }
         healthStore.enableBackgroundDelivery(for: stepType, frequency: .immediate) { [weak self] success, error in
-            Task { @MainActor [weak self] in
-                self?.isBackgroundDeliveryEnabled = success
+            guard let self else { return }
+            Task { @MainActor in
+                self.isBackgroundDeliveryEnabled = success
                 if let error {
-                    self?.lastError = error
+                    self.lastError = error
                 }
             }
         }
