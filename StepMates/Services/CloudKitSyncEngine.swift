@@ -318,7 +318,7 @@ final class CloudKitSyncEngine {
         return true
     }
 
-    // MARK: Nudge & Pinky Promise
+    // MARK: Nudge
 
     /// Touches this device's own `lastNudgeTimestamp` — the partner's subscription fires on
     /// the change, and their next refresh surfaces the nudge.
@@ -329,55 +329,6 @@ final class CloudKitSyncEngine {
             let saved = try await activeDatabase.save(record)
             cachedMemberRecord = saved
             mySnapshot = MemberSnapshot(record: saved)
-        } catch {
-            handle(error)
-        }
-    }
-
-    /// The trailing partner's ask for mercy — written to their own record for the other
-    /// side to see and resolve.
-    func submitPinkyPromiseRequest(reason: String) async {
-        guard let role else { return }
-        do {
-            let record = try await loadOrCreateMemberRecord()
-            let request = PinkyPromiseRequest(reason: reason, requestedAt: .now, requestedByRole: role, resolution: nil)
-            record[MemberField.pendingPinkyPromise] = try JSONEncoder().encode(request) as CKRecordValue
-            let saved = try await activeDatabase.save(record)
-            cachedMemberRecord = saved
-            mySnapshot = MemberSnapshot(record: saved)
-        } catch {
-            handle(error)
-        }
-    }
-
-    /// The other partner's answer. Resolves the requester's pending flag in place (rather
-    /// than clearing it) so their device can distinguish "approved" from "denied", and waives
-    /// the active wager outright on approval.
-    func respondToPinkyPromise(approved: Bool) async {
-        guard let zoneID, let role else { return }
-        let partnerRole: PairingRole = role == .owner ? .partner : .owner
-        let partnerMemberID = CKRecord.ID(recordName: "Member-\(partnerRole.rawValue)", zoneID: zoneID)
-
-        do {
-            let record = try await activeDatabase.record(for: partnerMemberID)
-            if var request = decodePendingPinkyPromise(from: record) {
-                request.resolution = approved ? .approved : .denied
-                record[MemberField.pendingPinkyPromise] = try JSONEncoder().encode(request) as CKRecordValue
-            }
-            let saved = try await activeDatabase.save(record)
-            partnerSnapshot = MemberSnapshot(record: saved)
-
-            if approved, var wager = roomSnapshot?.activeWager {
-                wager.status = .resolved
-                wager.outcome = WagerOutcome(
-                    loserUserID: nil,
-                    bothSucceeded: true,
-                    resolvedAt: .now,
-                    confirmedByCurrentUser: true,
-                    confirmedByPartner: true
-                )
-                try await updateActiveWager(wager)
-            }
         } catch {
             handle(error)
         }
@@ -447,11 +398,6 @@ final class CloudKitSyncEngine {
             cachedMemberRecord = record
             return record
         }
-    }
-
-    private func decodePendingPinkyPromise(from record: CKRecord) -> PinkyPromiseRequest? {
-        guard let data = record[MemberField.pendingPinkyPromise] as? Data else { return nil }
-        return try? JSONDecoder().decode(PinkyPromiseRequest.self, from: data)
     }
 
     private func generateRoomID() -> String {
@@ -532,7 +478,6 @@ private enum MemberField {
     static let currentSteps = "currentSteps"
     static let todayDistance = "todayDistance"
     static let lastSyncedAt = "lastSyncedAt"
-    static let pendingPinkyPromise = "pendingPinkyPromise"
     static let lastNudgeTimestamp = "lastNudgeTimestamp"
 }
 
@@ -562,10 +507,5 @@ private extension MemberSnapshot {
         todayDistance = record[MemberField.todayDistance] as? Double ?? 0
         lastSyncedAt = record[MemberField.lastSyncedAt] as? Date ?? .now
         lastNudgeTimestamp = record[MemberField.lastNudgeTimestamp] as? Date
-        if let data = record[MemberField.pendingPinkyPromise] as? Data {
-            pendingPinkyPromise = try? JSONDecoder().decode(PinkyPromiseRequest.self, from: data)
-        } else {
-            pendingPinkyPromise = nil
-        }
     }
 }

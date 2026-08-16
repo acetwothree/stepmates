@@ -14,19 +14,6 @@ struct HomeViewModelTests {
         #expect(viewModel.nudgeConfirmation == "Nudge sent to \(viewModel.pair.partner.displayName)!")
     }
 
-    @Test func requestPinkyPromiseMovesStateToRequested() {
-        let viewModel = HomeViewModel()
-        viewModel.requestPinkyPromise()
-        #expect(viewModel.pinkyPromiseState == .requested)
-    }
-
-    @Test func repeatedPinkyPromiseRequestWhilePendingIsIgnored() {
-        let viewModel = HomeViewModel()
-        viewModel.requestPinkyPromise()
-        viewModel.requestPinkyPromise()
-        #expect(viewModel.pinkyPromiseState == .requested)
-    }
-
     @Test func addWagerReplacesActiveWager() {
         let viewModel = HomeViewModel(activeWager: nil)
         viewModel.addWager(.mockCoOp)
@@ -53,7 +40,6 @@ struct HomeViewModelTests {
             currentSteps: 0,
             todayDistance: 0,
             lastSyncedAt: .now,
-            pendingPinkyPromise: nil,
             lastNudgeTimestamp: nil
         )
         defer { CloudKitSyncEngine.shared.partnerSnapshot = nil }

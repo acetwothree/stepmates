@@ -27,20 +27,6 @@ enum PairingState: Equatable, Sendable {
     case paired
 }
 
-/// A mercy request attached to a `MemberStateRecord` — written by the requester, resolved
-/// by their partner setting `resolution`.
-struct PinkyPromiseRequest: Codable, Equatable, Sendable {
-    enum Resolution: String, Codable, Sendable {
-        case approved
-        case denied
-    }
-
-    var reason: String
-    var requestedAt: Date
-    var requestedByRole: PairingRole
-    var resolution: Resolution?
-}
-
 /// Mirrors a `RoomRecord`.
 struct RoomSnapshot: Equatable, Sendable {
     var roomID: String
@@ -59,6 +45,5 @@ struct MemberSnapshot: Equatable, Sendable {
     var currentSteps: Int
     var todayDistance: Double
     var lastSyncedAt: Date
-    var pendingPinkyPromise: PinkyPromiseRequest?
     var lastNudgeTimestamp: Date?
 }

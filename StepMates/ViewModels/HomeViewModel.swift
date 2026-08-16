@@ -4,24 +4,12 @@
 //
 //  Drives the Home screen's game state. The current user's steps mirror HealthKitManager
 //  live; the partner's steps, the shared streak, and the active wager mirror
-//  CloudKitSyncEngine live. Nudges, Pinky Promise, and new wagers all round-trip through
-//  CloudKit for real — nothing here is simulated anymore.
+//  CloudKitSyncEngine live. Nudges and new wagers round-trip through CloudKit for real —
+//  nothing here is simulated anymore.
 //
 
 import SwiftUI
 import Observation
-
-/// Lifecycle of a trailing partner's request to waive today's stake.
-enum PinkyPromiseState: Equatable, Sendable {
-    /// No request outstanding.
-    case idle
-    /// Sent, waiting on the partner to approve or deny.
-    case requested
-    /// Partner approved — today's stake is waived.
-    case approved
-    /// Partner denied — the stake stands.
-    case denied
-}
 
 @MainActor
 @Observable
@@ -34,10 +22,6 @@ final class HomeViewModel {
     var cloudKitSyncEngine: CloudKitSyncEngine
 
     var nudgeConfirmation: String?
-    /// Status of a mercy request *I* submitted.
-    var pinkyPromiseState: PinkyPromiseState = .idle
-    /// A mercy request *my partner* submitted, waiting on my response.
-    var incomingPinkyPromiseRequest: PinkyPromiseRequest?
     var showCreateWagerSheet = false
     var showWeeklyRecap = false
 
@@ -169,16 +153,9 @@ final class HomeViewModel {
                     partnerDay: partnerDay
                 )
             }
-
-            if let pending = partner.pendingPinkyPromise, pending.resolution == nil {
-                incomingPinkyPromiseRequest = pending
-            } else {
-                incomingPinkyPromiseRequest = nil
-            }
         } else if cloudKitSyncEngine.pairingState == .paired {
             // Room exists but the partner hasn't written their first state yet.
             pair.connectionStatus = .pending
-            incomingPinkyPromiseRequest = nil
         }
 
         if let room = cloudKitSyncEngine.roomSnapshot {
@@ -192,16 +169,6 @@ final class HomeViewModel {
 
         if let mine = cloudKitSyncEngine.mySnapshot {
             pair.currentUser.displayName = mine.displayName
-        }
-
-        if let mine = cloudKitSyncEngine.mySnapshot?.pendingPinkyPromise {
-            switch mine.resolution {
-            case .approved: pinkyPromiseState = .approved
-            case .denied: pinkyPromiseState = .denied
-            case nil: pinkyPromiseState = .requested
-            }
-        } else {
-            pinkyPromiseState = .idle
         }
     }
 
@@ -226,32 +193,6 @@ final class HomeViewModel {
 
         Task {
             await cloudKitSyncEngine.sendNudge()
-        }
-    }
-
-    /// Submits a real mercy request for today's stake. The result (approved/denied) arrives
-    /// via `syncFromCloudKit()` once the partner responds.
-    func requestPinkyPromise() {
-        guard pinkyPromiseState != .requested else { return }
-        HapticService.shared.wagerLock()
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-            pinkyPromiseState = .requested
-        }
-
-        let reason = "Trailing by \(comparison.currentUserDay.stepsRemaining) steps — cut me some slack?"
-        Task {
-            await cloudKitSyncEngine.submitPinkyPromiseRequest(reason: reason)
-        }
-    }
-
-    /// Answers the partner's own incoming mercy request.
-    func respondToPinkyPromise(approved: Bool) {
-        HapticService.shared.wagerLock()
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-            incomingPinkyPromiseRequest = nil
-        }
-        Task {
-            await cloudKitSyncEngine.respondToPinkyPromise(approved: approved)
         }
     }
 

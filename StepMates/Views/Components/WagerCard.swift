@@ -15,7 +15,7 @@ struct WagerCard: View {
         case .pending: return SweatmatesColors.pending
         case .active: return SweatmatesColors.accentLime
         case .resolved: return SweatmatesColors.textTertiary
-        case .pinkyPromiseReview: return SweatmatesColors.accentFlame
+        case .disputed: return SweatmatesColors.accentFlame
         }
     }
 
@@ -47,7 +47,7 @@ struct WagerCard: View {
 
     @ViewBuilder
     private var statusPill: some View {
-        Text(wager.status == .pinkyPromiseReview ? "Pinky Promise" : wager.status.rawValue.capitalized)
+        Text(wager.status == .disputed ? "Under Review" : wager.status.rawValue.capitalized)
             .font(SweatmatesTypography.microLabel(10))
             .tracking(1.2)
             .textCase(.uppercase)

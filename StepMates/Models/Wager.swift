@@ -41,9 +41,9 @@ enum WagerStatus: String, Codable, Sendable {
     case active
     /// Window closed and a winner/outcome has been recorded.
     case resolved
-    /// Outcome is disputed or ambiguous (e.g. a HealthKit sync gap) — held for manual confirmation
-    /// by both partners, mirroring Sweatmates' honor-system "Pinky Promise" review.
-    case pinkyPromiseReview
+    /// Outcome is disputed or ambiguous (e.g. a HealthKit sync gap) — held for manual
+    /// confirmation by both partners before it counts as resolved.
+    case disputed
 
     var isOpen: Bool { self == .pending || self == .active }
 }
@@ -122,7 +122,7 @@ struct Wager: Identifiable, Codable, Equatable, Sendable {
         self.outcome = outcome
     }
 
-    var isUnderReview: Bool { status == .pinkyPromiseReview }
+    var isUnderReview: Bool { status == .disputed }
     var daysRemaining: Int {
         max(0, Calendar.current.dateComponents([.day], from: .now, to: endDate).day ?? 0)
     }
@@ -162,7 +162,7 @@ extension Wager {
     static let mockPendingReview = Wager(
         pairID: samplePairID,
         mode: .versusSprint,
-        status: .pinkyPromiseReview,
+        status: .disputed,
         stakeForCurrentUser: PenaltyStake(owner: "Ben", stakeDescription: "I do the dishes all week"),
         stakeForPartner: PenaltyStake(owner: "Jess", stakeDescription: "You pick the next trip"),
         endDate: Calendar.current.date(byAdding: .day, value: -1, to: .now) ?? .now,

@@ -2,8 +2,8 @@
 //  HomeView.swift
 //  StepMates
 //
-//  The live partner stage: streak header, head-to-head arena, active stake, and
-//  nudge/pinky-promise actions — the screen a user lands on every time they open the app.
+//  The live partner stage: streak header, head-to-head arena, today's wager, and
+//  nudge/edit-wager actions — the screen a user lands on every time they open the app.
 //
 
 import SwiftUI
@@ -18,11 +18,13 @@ struct HomeView: View {
 
                 HealthKitStatusBanner(status: viewModel.healthKitManager.authorizationStatus)
 
-                if let request = viewModel.incomingPinkyPromiseRequest {
-                    IncomingPinkyPromiseBanner(partnerName: viewModel.pair.partner.displayName, request: request) { approved in
-                        viewModel.respondToPinkyPromise(approved: approved)
-                    }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                if viewModel.cloudKitSyncEngine.partnerSnapshot == nil {
+                    InvitePartnerCard(
+                        displayName: viewModel.pair.currentUser.displayName,
+                        dailyStepGoal: viewModel.pair.currentUser.dailyStepGoal,
+                        pairingState: viewModel.cloudKitSyncEngine.pairingState,
+                        cloudKitSyncEngine: viewModel.cloudKitSyncEngine
+                    )
                 }
 
                 StepArenaView(pair: viewModel.pair, comparison: viewModel.comparison)
@@ -30,7 +32,7 @@ struct HomeView: View {
                     .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(SweatmatesColors.cardSurface))
 
                 if let wager = viewModel.activeWager {
-                    ActiveWagerBox(wager: wager, pair: viewModel.pair, comparison: viewModel.comparison)
+                    TodaysWagerCard(wager: wager, pair: viewModel.pair)
                 } else {
                     startWagerPrompt
                 }
@@ -39,7 +41,7 @@ struct HomeView: View {
             }
             .padding(20)
             .animation(.spring(response: 0.5, dampingFraction: 0.85), value: viewModel.healthKitManager.authorizationStatus)
-            .animation(.spring(response: 0.5, dampingFraction: 0.85), value: viewModel.incomingPinkyPromiseRequest)
+            .animation(.spring(response: 0.5, dampingFraction: 0.85), value: viewModel.cloudKitSyncEngine.partnerSnapshot)
         }
         .background(SweatmatesColors.background.ignoresSafeArea())
         .sheet(isPresented: $viewModel.showCreateWagerSheet) {
@@ -98,13 +100,17 @@ struct HomeView: View {
         }
     }
 
+    /// `cardSurface` + `textOnCard` rather than `cardSurfaceElevated` + `textPrimary` — the
+    /// latter pairing is an always-light background with an adaptive foreground, which goes
+    /// low-contrast (near-white icon on a light cream fill) in dark mode.
     private func circularIconButton(systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(SweatmatesColors.textPrimary)
-                .frame(width: 40, height: 40)
-                .background(Circle().fill(SweatmatesColors.cardSurfaceElevated))
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(SweatmatesColors.textOnCard)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(SweatmatesColors.cardSurface))
+                .overlay(Circle().stroke(SweatmatesColors.divider, lineWidth: 1))
         }
         .buttonStyle(.plain)
     }

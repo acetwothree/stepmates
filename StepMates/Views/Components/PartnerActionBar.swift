@@ -2,7 +2,8 @@
 //  PartnerActionBar.swift
 //  StepMates
 //
-//  "Digital Nudge" pokes your partner; "Pinky Promise" asks them to waive today's stake.
+//  The Home screen's bottom action row: nudge your partner, or open the wager sheet to
+//  edit today's stakes.
 //
 
 import SwiftUI
@@ -21,60 +22,43 @@ struct PartnerActionBar: View {
 
             HStack(spacing: 12) {
                 actionButton(
-                    title: "Digital Nudge",
-                    icon: "hand.point.right.fill",
+                    title: "Nudge Partner",
+                    emoji: "👟",
                     gradient: SweatmatesColors.flameGradient
                 ) {
                     viewModel.sendNudge()
                 }
 
                 actionButton(
-                    title: pinkyPromiseTitle,
-                    icon: pinkyPromiseIcon,
-                    gradient: SweatmatesColors.limeGradient,
-                    isDisabled: viewModel.pinkyPromiseState == .requested
+                    title: "Edit Today's Wager",
+                    emoji: "⚡️",
+                    gradient: SweatmatesColors.limeGradient
                 ) {
-                    viewModel.requestPinkyPromise()
+                    viewModel.showCreateWagerSheet = true
                 }
             }
         }
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: viewModel.nudgeConfirmation)
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: viewModel.pinkyPromiseState)
-    }
-
-    private var pinkyPromiseTitle: String {
-        switch viewModel.pinkyPromiseState {
-        case .idle, .denied: return "Pinky Promise"
-        case .requested: return "Waiting…"
-        case .approved: return "Waived!"
-        }
-    }
-
-    private var pinkyPromiseIcon: String {
-        viewModel.pinkyPromiseState == .approved ? "hands.sparkles.fill" : "hands.sparkles"
     }
 
     @ViewBuilder
     private func actionButton(
         title: String,
-        icon: String,
+        emoji: String,
         gradient: LinearGradient,
-        isDisabled: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             VStack(spacing: 6) {
-                Image(systemName: icon).font(.system(size: 18, weight: .bold))
+                Text(emoji).font(.system(size: 18))
                 Text(title).font(SweatmatesTypography.caption(13, weight: .bold))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(gradient, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .foregroundStyle(.white)
-            .opacity(isDisabled ? 0.6 : 1)
         }
         .buttonStyle(.plain)
-        .disabled(isDisabled)
     }
 }
 

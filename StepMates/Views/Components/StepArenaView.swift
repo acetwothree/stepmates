@@ -2,7 +2,9 @@
 //  StepArenaView.swift
 //  StepMates
 //
-//  The hero head-to-head: dual progress rings plus the dynamic "who's safe" delta pill.
+//  The hero head-to-head: dual progress rings with the step count as the largest thing on
+//  screen, each person's goal + percentage underneath, and a head-to-head "leading/trailing"
+//  pill comparing the two partners directly (not each against their own goal).
 //
 
 import SwiftUI
@@ -31,7 +33,9 @@ struct StepArenaView: View {
 
     @ViewBuilder
     private func ringColumn(name: String, day: StepDay, gradient: LinearGradient) -> some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
+            Text(name.uppercased()).microLabel()
+
             ZStack {
                 Circle()
                     .stroke(SweatmatesColors.divider, lineWidth: 14)
@@ -42,22 +46,19 @@ struct StepArenaView: View {
                     .rotationEffect(.degrees(-90))
                     .animation(.spring(response: 0.7, dampingFraction: 0.85), value: day.progress)
 
-                VStack(spacing: 2) {
-                    Text(day.stepCount.formatted())
-                        .font(SweatmatesTypography.statNumber(28))
-                        .foregroundStyle(SweatmatesColors.textOnCard)
-                        .contentTransition(.numericText())
-                        .minimumScaleFactor(0.7)
-                        .lineLimit(1)
-                    Text("\(Int(day.progress * 100))%")
-                        .font(SweatmatesTypography.caption(12, weight: .bold))
-                        .foregroundStyle(SweatmatesColors.textOnCardSecondary)
-                }
-                .padding(.horizontal, 8)
+                Text(day.stepCount.formatted())
+                    .font(SweatmatesTypography.statNumber(34))
+                    .foregroundStyle(SweatmatesColors.textOnCard)
+                    .contentTransition(.numericText())
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .padding(.horizontal, 10)
             }
-            .frame(width: 140, height: 140)
+            .frame(width: 148, height: 148)
 
-            Text(name.uppercased()).microLabel()
+            Text("Goal \(day.goal.formatted()) · \(Int(day.progress * 100))%")
+                .font(SweatmatesTypography.caption(12, weight: .semibold))
+                .foregroundStyle(SweatmatesColors.textOnCardSecondary)
         }
         .frame(maxWidth: .infinity)
     }
@@ -73,30 +74,16 @@ struct StepArenaView: View {
             .animation(.spring(response: 0.5, dampingFraction: 0.8), value: content.text)
     }
 
-    /// Priority: surface whichever partner still needs to move (actionable — prompts a nudge).
-    /// Only once the partner is safe do we celebrate the current user's own margin.
+    /// Head-to-head framing: who's ahead of *whom*, right now — not who's ahead of their own
+    /// goal. Green when the current user leads, orange when they trail, neutral on a tie.
     private var pillContent: (icon: String, text: String, tone: Color) {
-        let me = comparison.currentUserDay
-        let partner = comparison.partnerDay
-
-        if !partner.hasHitGoal {
-            return (
-                "exclamationmark.triangle.fill",
-                "\(pair.partner.displayName) is trailing — \(partner.stepsRemaining.formatted()) steps to safety",
-                SweatmatesColors.accentFlame
-            )
-        } else if me.hasHitGoal {
-            return (
-                "checkmark.seal.fill",
-                "You're safe (+\(me.surplusOverGoal.formatted()) steps)",
-                SweatmatesColors.accentLimeDeep
-            )
-        } else {
-            return (
-                "flame.fill",
-                "You're trailing — \(me.stepsRemaining.formatted()) steps to safety",
-                SweatmatesColors.accentFlame
-            )
+        switch comparison.leader {
+        case .currentUser:
+            return ("arrow.up.circle.fill", "Leading by \(comparison.delta.formatted()) steps", SweatmatesColors.accentLimeDeep)
+        case .partner:
+            return ("arrow.down.circle.fill", "Trailing by \(comparison.delta.formatted()) steps", SweatmatesColors.accentFlame)
+        case .tied:
+            return ("equal.circle.fill", "Tied right now", SweatmatesColors.textSecondary)
         }
     }
 }
