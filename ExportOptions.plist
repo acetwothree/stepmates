@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Uploads straight to App Store Connect / TestFlight as part of export — no separate
+	     altool/notarytool step needed. Auth is supplied via -authenticationKeyPath/-ID/-IssuerID
+	     flags on the xcodebuild -exportArchive invocation, not stored in this file. -->
+	<key>method</key>
+	<string>app-store</string>
+	<key>destination</key>
+	<string>upload</string>
+
+	<!-- Replaced by the CI workflow before use — see .github/workflows/testflight.yml.
+	     Safe to leave as placeholders for local/manual exports too; Xcode will prompt. -->
+	<key>teamID</key>
+	<string>__APPLE_TEAM_ID__</string>
+	<key>signingStyle</key>
+	<string>manual</string>
+	<key>signingCertificate</key>
+	<string>Apple Distribution</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.stepmates.app</key>
+		<string>__PROVISIONING_PROFILE_UUID__</string>
+	</dict>
+
+	<key>uploadSymbols</key>
+	<true/>
+	<key>stripSwiftSymbols</key>
+	<true/>
+</dict>
+</plist>
