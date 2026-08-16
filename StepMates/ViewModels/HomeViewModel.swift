@@ -59,6 +59,16 @@ final class HomeViewModel {
         self.healthKitManager = healthKitManager
         self.cloudKitSyncEngine = cloudKitSyncEngine
 
+        // Apply whatever onboarding collected (name, daily step goal) over the mock
+        // defaults, so answering those questions during onboarding actually shows up.
+        if let profile = OnboardingProfileStore.load() {
+            if !profile.firstName.isEmpty {
+                self.pair.currentUser.displayName = profile.firstName
+            }
+            self.pair.currentUser.dailyStepGoal = profile.dailyStepGoal
+            self.comparison.currentUserDay.goal = profile.dailyStepGoal
+        }
+
         // Pick up whatever each engine already has before arming tracking for whatever
         // comes next — withObservationTracking's onChange only fires on the *next*
         // mutation, not the value already current at registration time.
@@ -173,9 +183,15 @@ final class HomeViewModel {
 
         if let room = cloudKitSyncEngine.roomSnapshot {
             pair.sharedStreak = room.streakCount
+            pair.currentUser.dailyStepGoal = room.targetGoal
+            comparison.currentUserDay.goal = room.targetGoal
             if let wager = room.activeWager {
                 activeWager = wager
             }
+        }
+
+        if let mine = cloudKitSyncEngine.mySnapshot {
+            pair.currentUser.displayName = mine.displayName
         }
 
         if let mine = cloudKitSyncEngine.mySnapshot?.pendingPinkyPromise {
@@ -249,9 +265,13 @@ final class HomeViewModel {
         }
     }
 
-    /// Surfaces the weekly recap automatically on Sundays, once per session.
+    /// Surfaces the weekly recap automatically on Sundays, once per session — but only once
+    /// the pairing is actually established (partner has synced at least once). Without that
+    /// gate, a user who just paired for the first time on a Sunday would get a "weekly
+    /// recap" popup for a week that never happened.
     func presentRecapIfNeeded(calendar: Calendar = .current, now: Date = .now) {
         guard !hasOfferedRecapThisSession else { return }
+        guard pair.connectionStatus == .connected else { return }
         hasOfferedRecapThisSession = true
         if calendar.component(.weekday, from: now) == 1 {
             showWeeklyRecap = true

@@ -66,7 +66,9 @@ final class CloudKitSyncEngine {
 
     /// Creates the custom zone, writes the room + this device's member record, and attaches
     /// a zone-wide `CKShare` — everything in the zone becomes visible to whoever accepts it.
-    func createRoomAndShare() async throws -> CKShare {
+    /// `displayName` and `dailyStepGoal` default to sensible fallbacks so existing callers
+    /// (and previews) don't need to change, but onboarding threads the collected values in.
+    func createRoomAndShare(displayName: String? = nil, dailyStepGoal: Int = 10_000) async throws -> CKShare {
         pairingState = .pairing
         let zoneID = CKRecordZone.ID(zoneName: Self.zoneName, ownerName: CKCurrentUserDefaultName)
 
@@ -75,7 +77,7 @@ final class CloudKitSyncEngine {
 
             let roomRecord = CKRecord(recordType: RecordType.room, recordID: CKRecord.ID(recordName: "Room", zoneID: zoneID))
             roomRecord[RoomField.roomID] = generateRoomID() as CKRecordValue
-            roomRecord[RoomField.targetGoal] = 10_000 as CKRecordValue
+            roomRecord[RoomField.targetGoal] = dailyStepGoal as CKRecordValue
             roomRecord[RoomField.mode] = WagerMode.versusSprint.rawValue as CKRecordValue
             roomRecord[RoomField.streakCount] = 0 as CKRecordValue
             roomRecord[RoomField.updatedAt] = Date.now as CKRecordValue
@@ -84,7 +86,7 @@ final class CloudKitSyncEngine {
             let memberRecord = CKRecord(recordType: RecordType.memberState, recordID: memberRecordID)
             let userRecordID = try await container.userRecordID()
             memberRecord[MemberField.userRecordID] = userRecordID.recordName as CKRecordValue
-            memberRecord[MemberField.displayName] = UIDevice.current.name as CKRecordValue
+            memberRecord[MemberField.displayName] = (displayName?.isEmpty == false ? displayName! : UIDevice.current.name) as CKRecordValue
             memberRecord[MemberField.currentSteps] = 0 as CKRecordValue
             memberRecord[MemberField.todayDistance] = 0.0 as CKRecordValue
             memberRecord[MemberField.lastSyncedAt] = Date.now as CKRecordValue

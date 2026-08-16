@@ -2,8 +2,11 @@
 //  HealthKitPermissionView.swift
 //  StepMates
 //
-//  The very first screen: sets expectations for the passive, no-manual-logging model
-//  before asking for Health access, then handles every outcome of that request in place.
+//  Sets expectations for the passive, no-manual-logging model before asking for Health
+//  access. Advances the flow once the system prompt resolves (any outcome) rather than
+//  reactively watching authorizationStatus — same "explicit completion, not reactive state"
+//  principle as PartnerInviteView, for the same reason: keeps the onboarding coordinator's
+//  navigation predictable regardless of how a request happens to resolve.
 //
 
 import SwiftUI
@@ -11,12 +14,17 @@ import UIKit
 
 struct HealthKitPermissionView: View {
     var healthKitManager: HealthKitManager
-    var onSkip: () -> Void
+    var onFinished: () -> Void
+    var onBack: (() -> Void)?
 
     @State private var isRequesting = false
 
     var body: some View {
         VStack(spacing: 0) {
+            if onBack != nil {
+                header
+            }
+
             Spacer()
 
             iconBadge
@@ -55,23 +63,13 @@ struct HealthKitPermissionView: View {
             Spacer()
 
             VStack(spacing: 14) {
-                Button(action: requestAccess) {
-                    HStack {
-                        if isRequesting {
-                            ProgressView().tint(.white)
-                        }
-                        Text(isRequesting ? "Requesting…" : "Allow Step Sync")
-                    }
-                    .font(SweatmatesTypography.headline(17, weight: .bold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(SweatmatesColors.flameGradient, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .foregroundStyle(.white)
-                }
-                .buttonStyle(.plain)
-                .disabled(isRequesting)
+                OnboardingCTAButton(
+                    title: isRequesting ? "Requesting…" : "Allow Step Sync",
+                    isLoading: isRequesting,
+                    action: requestAccess
+                )
 
-                Button("Maybe Later", action: onSkip)
+                Button("Maybe Later", action: onFinished)
                     .font(SweatmatesTypography.body(14, weight: .semibold))
                     .foregroundStyle(SweatmatesColors.textSecondary)
             }
@@ -80,6 +78,25 @@ struct HealthKitPermissionView: View {
         }
         .background(SweatmatesColors.background.ignoresSafeArea())
         .animation(.spring(response: 0.5, dampingFraction: 0.85), value: healthKitManager.authorizationStatus)
+    }
+
+    private var header: some View {
+        HStack(spacing: 16) {
+            Button {
+                onBack?()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(SweatmatesColors.textSecondary)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+
+            ProgressView(value: OnboardingStep.healthKitPermission.progress)
+                .tint(SweatmatesColors.accentFlame)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
     }
 
     private var iconBadge: some View {
@@ -110,16 +127,17 @@ struct HealthKitPermissionView: View {
         Task {
             await healthKitManager.requestAuthorization()
             isRequesting = false
+            onFinished()
         }
     }
 }
 
 #Preview("Not Determined") {
-    HealthKitPermissionView(healthKitManager: .shared, onSkip: {})
+    HealthKitPermissionView(healthKitManager: .shared, onFinished: {}, onBack: {})
 }
 
 #Preview("Denied") {
     let manager = HealthKitManager.shared
     manager.authorizationStatus = .denied
-    return HealthKitPermissionView(healthKitManager: manager, onSkip: {})
+    return HealthKitPermissionView(healthKitManager: manager, onFinished: {}, onBack: {})
 }

@@ -50,4 +50,16 @@ struct HomeViewModelTests {
         viewModel.presentRecapIfNeeded(calendar: calendar, now: sunday)
         #expect(viewModel.showWeeklyRecap == true)
     }
+
+    @Test func recapDoesNotAutoPresentForAFreshPairingEvenOnSunday() {
+        // A pairing whose partner hasn't synced yet (.pending, not .connected) shouldn't
+        // get a "weekly recap" popup for a week that never happened — the exact scenario
+        // that used to flash the recap modal right after completing onboarding.
+        let viewModel = HomeViewModel(pair: .mockPending)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let sunday = calendar.date(from: DateComponents(year: 2026, month: 8, day: 16))!
+        viewModel.presentRecapIfNeeded(calendar: calendar, now: sunday)
+        #expect(viewModel.showWeeklyRecap == false)
+    }
 }
