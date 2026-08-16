@@ -110,7 +110,7 @@ extension Array where Element == HourlyStepSnapshot {
             guard hour >= wakeHour, hour <= endHour else {
                 return HourlyStepSnapshot(hour: hour, cumulativeSteps: hour < wakeHour ? 0 : finalTotal)
             }
-            let progress = Double(hour - wakeHour) / Double(max(endHour - wakeHour, 1))
+            let progress = Double(hour - wakeHour) / Double(Swift.max(endHour - wakeHour, 1))
             let eased = progress * progress * (3 - 2 * progress) // smoothstep
             return HourlyStepSnapshot(hour: hour, cumulativeSteps: Int(Double(finalTotal) * eased))
         }
