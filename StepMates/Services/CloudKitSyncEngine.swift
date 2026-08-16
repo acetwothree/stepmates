@@ -122,7 +122,12 @@ final class CloudKitSyncEngine {
             // share, and creating a second one fails, so reuse the existing one instead of
             // erroring out.
             if let existingShare = try await fetchExistingZoneShare(zoneID: zoneID) {
-                _ = try await privateDatabase.modifyRecords(saving: [roomRecord, memberRecord], deleting: [], savePolicy: .allKeys)
+                let reuseResults = try await saveRecordsNonAtomically([roomRecord, memberRecord])
+                for recordID in [roomRecord.recordID, memberRecord.recordID] {
+                    if case .failure(let saveError) = reuseResults[recordID] {
+                        throw saveError
+                    }
+                }
 
                 self.zoneID = zoneID
                 role = .owner
@@ -146,17 +151,16 @@ final class CloudKitSyncEngine {
             // — freshly-constructed CKRecord objects carry no change tag to satisfy that
             // check against. We're the zone owner intentionally re-establishing our own
             // room, so overwriting prior state here is correct.
-            let (saveResults, _) = try await privateDatabase.modifyRecords(
-                saving: [roomRecord, memberRecord, share],
-                deleting: [],
-                savePolicy: .allKeys
-            )
+            //
+            // Non-atomic and operation-based rather than the `modifyRecords` convenience
+            // method: under atomic batching, CloudKit collapses every record's outcome into
+            // one content-free "atomic failure" the moment any single record fails, and the
+            // convenience API's thrown CKError didn't carry per-item detail to unwrap either
+            // (partialErrorsByItemID came back empty in practice) — so there was no way to
+            // tell which of the three records was actually the problem, or why. Saving
+            // non-atomically lets whichever record is broken report its own real error.
+            let saveResults = try await saveRecordsNonAtomically([roomRecord, memberRecord, share])
 
-            // Surface the *real* per-record failure reason rather than the opaque
-            // .roomSetupFailed fallback — modifyRecords can fail an individual item (e.g. the
-            // record type genuinely doesn't exist in this CloudKit environment yet) without
-            // throwing at the batch level, and swallowing that into a generic error made this
-            // undiagnosable from the field.
             for recordID in [roomRecord.recordID, memberRecord.recordID, share.recordID] {
                 if case .failure(let saveError) = saveResults[recordID] {
                     throw saveError
@@ -284,6 +288,43 @@ final class CloudKitSyncEngine {
             }
 
             container.add(operation)
+        }
+    }
+
+    /// Saves records one-by-one within a single operation rather than atomically — see the
+    /// call site in `createRoomAndShare` for why: an atomic batch collapses every record's
+    /// result into one undiagnosable "atomic failure" the instant any one of them fails, with
+    /// no per-item detail available to unwrap. This surfaces each record's real, independent
+    /// result instead.
+    private func saveRecordsNonAtomically(_ records: [CKRecord]) async throws -> [CKRecord.ID: Result<CKRecord, Error>] {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[CKRecord.ID: Result<CKRecord, Error>], Error>) in
+            let operation = CKModifyRecordsOperation(recordsToSave: records, recordIDsToDelete: nil)
+            operation.savePolicy = .allKeys
+            operation.isAtomic = false
+
+            var results: [CKRecord.ID: Result<CKRecord, Error>] = [:]
+            operation.perRecordSaveBlock = { recordID, result in
+                results[recordID] = result
+            }
+
+            operation.modifyRecordsResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume(returning: results)
+                case .failure(let error):
+                    // The operation itself failed outright (e.g. a network/auth problem before
+                    // any per-record outcome was ever determined) — whatever per-record results
+                    // did land are still meaningful, so surface those instead of just the
+                    // operation-level error if there are any.
+                    if results.isEmpty {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(returning: results)
+                    }
+                }
+            }
+
+            privateDatabase.add(operation)
         }
     }
 
