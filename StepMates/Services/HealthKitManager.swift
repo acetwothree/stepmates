@@ -268,10 +268,15 @@ final class HealthKitManager {
     /// and always calls the HealthKit completion handler — skipping it repeatedly throttles
     /// future background delivery for this app.
     private func handleObserverUpdate(completionHandler: @escaping HKObserverQueryCompletionHandler) async {
+        // The expiration handler isn't MainActor-isolated — it's a plain escaping closure
+        // handed to UIKit, not a Task, so it doesn't inherit this method's actor context.
+        // Hop explicitly before touching `backgroundTaskID` or `UIApplication.shared`.
         let taskID = UIApplication.shared.beginBackgroundTask(withName: "StepMates.HealthKitSync") { [weak self] in
-            guard let self, self.backgroundTaskID != .invalid else { return }
-            UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
-            self.backgroundTaskID = .invalid
+            Task { @MainActor [weak self] in
+                guard let self, self.backgroundTaskID != .invalid else { return }
+                UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
+                self.backgroundTaskID = .invalid
+            }
         }
         backgroundTaskID = taskID
 

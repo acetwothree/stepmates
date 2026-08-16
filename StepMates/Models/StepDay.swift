@@ -101,15 +101,16 @@ struct DailyStepComparison: Identifiable, Sendable {
 
 // MARK: - Mock Data
 
-extension HourlyStepSnapshot {
+extension Array where Element == HourlyStepSnapshot {
     /// A smooth, realistic-looking cumulative curve for canvas previews.
-    static func mockTrend(finalTotal: Int, throughHour: Int = 21) -> [HourlyStepSnapshot] {
+    static func mockTrend(finalTotal: Int, throughHour: Int? = nil) -> [HourlyStepSnapshot] {
         let wakeHour = 7
+        let endHour = throughHour ?? 21
         return (0...23).map { hour in
-            guard hour >= wakeHour, hour <= throughHour else {
+            guard hour >= wakeHour, hour <= endHour else {
                 return HourlyStepSnapshot(hour: hour, cumulativeSteps: hour < wakeHour ? 0 : finalTotal)
             }
-            let progress = Double(hour - wakeHour) / Double(max(throughHour - wakeHour, 1))
+            let progress = Double(hour - wakeHour) / Double(max(endHour - wakeHour, 1))
             let eased = progress * progress * (3 - 2 * progress) // smoothstep
             return HourlyStepSnapshot(hour: hour, cumulativeSteps: Int(Double(finalTotal) * eased))
         }
