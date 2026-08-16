@@ -49,7 +49,6 @@ final class HealthKitManager {
 
     private var observerQuery: HKObserverQuery?
     private var isBackgroundDeliveryEnabled = false
-    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
 
     private init() {}
 
@@ -248,20 +247,19 @@ final class HealthKitManager {
     private func startObservingStepChanges() {
         guard observerQuery == nil else { return }
 
-        let query = HKObserverQuery(sampleType: stepType, predicate: nil) { [weak self] _, completionHandler, error in
+        // No `self` capture here at all, by design: this closure's own isolation is
+        // whatever HealthKit calls it with, and handing a captured `self` off into a new
+        // Task from that ambiguous region is exactly what trips Swift 6's region-based
+        // "task or actor isolated value cannot be sent" check. Referencing the `.shared`
+        // singleton directly sidesteps it — nothing MainActor-isolated crosses the boundary,
+        // the `await` on the other side does the hop.
+        let query = HKObserverQuery(sampleType: stepType, predicate: nil) { _, completionHandler, error in
             guard error == nil else {
                 completionHandler()
                 return
             }
-            // Resolve self once here rather than re-declaring [weak self] on the nested
-            // Task — see the comment in handleObserverUpdate for why that trips Swift 6's
-            // region-based "task or actor isolated value cannot be sent" check.
-            guard let self else {
-                completionHandler()
-                return
-            }
-            Task { @MainActor in
-                await self.handleObserverUpdate(completionHandler: completionHandler)
+            Task {
+                await HealthKitManager.shared.handleObserverUpdate(completionHandler: completionHandler)
             }
         }
 
@@ -275,46 +273,40 @@ final class HealthKitManager {
     /// and always calls the HealthKit completion handler — skipping it repeatedly throttles
     /// future background delivery for this app.
     private func handleObserverUpdate(completionHandler: @escaping HKObserverQueryCompletionHandler) async {
-        // The expiration handler isn't MainActor-isolated — it's a plain escaping closure
-        // handed to UIKit, not a Task, so it doesn't inherit this method's actor context.
-        // Resolve `self` once here and let the Task capture that single strong reference
-        // directly; re-declaring [weak self] a second time on the nested Task is what
-        // trips Swift 6's region-based "task or actor isolated value cannot be sent" check.
-        let taskID = UIApplication.shared.beginBackgroundTask(withName: "StepMates.HealthKitSync") { [weak self] in
-            guard let self else { return }
-            Task { @MainActor in
-                self.endBackgroundTaskIfNeeded()
+        // `taskID` is a local var, captured by the expiration closure by reference. By the
+        // time that closure can possibly fire, the assignment below has already completed,
+        // so it always sees the real value — no need to touch `self` or an instance
+        // property from inside it at all.
+        var taskID: UIBackgroundTaskIdentifier = .invalid
+        taskID = UIApplication.shared.beginBackgroundTask(withName: "StepMates.HealthKitSync") {
+            if taskID != .invalid {
+                UIApplication.shared.endBackgroundTask(taskID)
+                taskID = .invalid
             }
         }
-        backgroundTaskID = taskID
 
         await refreshTodayStats()
         completionHandler()
 
         if taskID != .invalid {
             UIApplication.shared.endBackgroundTask(taskID)
-            backgroundTaskID = .invalid
+            taskID = .invalid
         }
-    }
-
-    /// Ends the currently tracked background task, if any. Pulled out so the expiration
-    /// handler's Task body has nothing to do but call one MainActor-isolated method.
-    private func endBackgroundTaskIfNeeded() {
-        guard backgroundTaskID != .invalid else { return }
-        UIApplication.shared.endBackgroundTask(backgroundTaskID)
-        backgroundTaskID = .invalid
     }
 
     private func enableBackgroundDeliveryIfNeeded() {
         guard !isBackgroundDeliveryEnabled else { return }
-        healthStore.enableBackgroundDelivery(for: stepType, frequency: .immediate) { [weak self] success, error in
-            guard let self else { return }
-            Task { @MainActor in
-                self.isBackgroundDeliveryEnabled = success
-                if let error {
-                    self.lastError = error
-                }
+        healthStore.enableBackgroundDelivery(for: stepType, frequency: .immediate) { success, error in
+            Task {
+                await HealthKitManager.shared.updateBackgroundDeliveryStatus(success: success, error: error)
             }
+        }
+    }
+
+    private func updateBackgroundDeliveryStatus(success: Bool, error: (any Error)?) {
+        isBackgroundDeliveryEnabled = success
+        if let error {
+            lastError = error
         }
     }
 }
