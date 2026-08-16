@@ -5,9 +5,9 @@
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>StepMates uses your daily step count from Apple Health to passively sync activity with your partner.</string>
+	<string>StepMates uses your step count to track daily progress and display shared stats with your partner.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>StepMates logs shared step activity and completed walk streaks to Apple Health.</string>
+	<string>StepMates syncs step goals and active walk streaks to Apple Health.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>processing</string>

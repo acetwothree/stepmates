@@ -29,6 +29,8 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleIconName: AppIcon
+        NSHealthShareUsageDescription: "StepMates uses your step count to track daily progress and display shared stats with your partner."
+        NSHealthUpdateUsageDescription: "StepMates syncs step goals and active walk streaks to Apple Health."
     entitlements:
       path: StepMates/Resources/StepMates.entitlements
       properties:
