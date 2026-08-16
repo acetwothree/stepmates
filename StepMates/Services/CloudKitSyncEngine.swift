@@ -11,9 +11,20 @@ import CloudKit
 import Observation
 import UIKit
 
-enum CloudKitSyncError: Error, Sendable {
-    case shareSaveFailed
+enum CloudKitSyncError: Error, Sendable, LocalizedError {
+    /// Carries *which specific sub-case* fell through, since the generic "operation couldn't
+    /// be completed" boilerplate Swift synthesizes for a plain enum case gives no way to tell
+    /// "the share result was missing from the response" from "it wasn't a CKShare" from any
+    /// other failure mode — all three used to collapse into the same undiagnosable message.
+    case shareSaveFailed(reason: String)
     case notPaired
+
+    var errorDescription: String? {
+        switch self {
+        case .shareSaveFailed(let reason): return "Couldn't finish creating the share (\(reason))."
+        case .notPaired: return "Not paired yet."
+        }
+    }
 }
 
 /// One device's today-so-far totals, pushed as a unit so a single write always carries a
@@ -151,9 +162,19 @@ final class CloudKitSyncEngine {
                     throw saveError
                 }
             }
-            guard case .success(let savedShareRecord) = saveResults[share.recordID],
-                  let savedShare = savedShareRecord as? CKShare else {
-                throw CloudKitSyncError.shareSaveFailed
+            // Distinguish "missing from the response" from "present but not a success" from
+            // "success but somehow not a CKShare" — three genuinely different failure modes
+            // that a single generic .shareSaveFailed case couldn't tell apart from the field.
+            guard let shareResult = saveResults[share.recordID] else {
+                throw CloudKitSyncError.shareSaveFailed(
+                    reason: "share result missing from server response (\(saveResults.count) of 3 records returned)"
+                )
+            }
+            guard case .success(let savedShareRecord) = shareResult else {
+                throw CloudKitSyncError.shareSaveFailed(reason: "share record was present but not marked successful")
+            }
+            guard let savedShare = savedShareRecord as? CKShare else {
+                throw CloudKitSyncError.shareSaveFailed(reason: "saved record was a \(type(of: savedShareRecord)), not a CKShare")
             }
 
             self.zoneID = zoneID
