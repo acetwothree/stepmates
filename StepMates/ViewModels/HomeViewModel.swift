@@ -24,6 +24,7 @@ final class HomeViewModel {
     var nudgeConfirmation: String?
     var showCreateWagerSheet = false
     var showWeeklyRecap = false
+    var showStats = false
 
     private var nudgeClearTask: Task<Void, Never>?
     private var hasOfferedRecapThisSession = false
@@ -111,7 +112,15 @@ final class HomeViewModel {
             HapticService.shared.dailyVictory()
         }
 
-        cloudKitSyncEngine.schedulePushLocalSteps(updatedDay.stepCount, distance: healthKitManager.todayDistanceMeters)
+        cloudKitSyncEngine.schedulePushLocalSteps(
+            StepPushPayload(
+                steps: updatedDay.stepCount,
+                distance: healthKitManager.todayDistanceMeters,
+                activeCalories: healthKitManager.todayActiveCalories,
+                flightsClimbed: healthKitManager.todayFlightsClimbed,
+                activeMinutes: healthKitManager.todayActiveMinutes
+            )
+        )
     }
 
     // MARK: CloudKit -> local state

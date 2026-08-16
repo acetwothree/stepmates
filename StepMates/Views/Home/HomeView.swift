@@ -52,6 +52,13 @@ struct HomeView: View {
         .sheet(isPresented: $viewModel.showWeeklyRecap) {
             WeeklyRecapModal(pair: viewModel.pair, recap: viewModel.weeklyRecap)
         }
+        .sheet(isPresented: $viewModel.showStats) {
+            StatsView(
+                pair: viewModel.pair,
+                healthKitManager: viewModel.healthKitManager,
+                partnerSnapshot: viewModel.cloudKitSyncEngine.partnerSnapshot
+            )
+        }
         .onAppear {
             viewModel.presentRecapIfNeeded()
         }
@@ -71,7 +78,7 @@ struct HomeView: View {
 
             HStack(spacing: 10) {
                 circularIconButton(systemName: "chart.bar.fill") {
-                    viewModel.showWeeklyRecap = true
+                    viewModel.showStats = true
                 }
                 circularIconButton(systemName: "gearshape.fill") {}
             }

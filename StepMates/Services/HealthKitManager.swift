@@ -43,10 +43,16 @@ final class HealthKitManager {
     private let healthStore = HKHealthStore()
     private let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
     private let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning)!
+    private let activeEnergyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)!
+    private let flightsType = HKQuantityType.quantityType(forIdentifier: .flightsClimbed)!
+    private let exerciseTimeType = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime)!
 
     var authorizationStatus: HealthKitAuthorizationStatus = .notDetermined
     var todaySteps = 0
     var todayDistanceMeters: Double = 0
+    var todayActiveCalories: Double = 0
+    var todayFlightsClimbed: Int = 0
+    var todayActiveMinutes: Int = 0
     var todayHourlyTrend: [HourlyStepSnapshot] = []
     var lastSyncedAt: Date?
     var lastError: (any Error)?
@@ -69,7 +75,10 @@ final class HealthKitManager {
         }
 
         do {
-            try await healthStore.requestAuthorization(toShare: [], read: [stepType, distanceType])
+            try await healthStore.requestAuthorization(
+                toShare: [],
+                read: [stepType, distanceType, activeEnergyType, flightsType, exerciseTimeType]
+            )
         } catch {
             lastError = error
         }
@@ -185,6 +194,97 @@ final class HealthKitManager {
         }
     }
 
+    /// Active calories burned from midnight through now, in kcal.
+    func fetchTodayActiveCalories() async throws -> Double {
+        try await fetchTodayCumulativeSum(for: activeEnergyType, unit: .kilocalorie())
+    }
+
+    /// Flights of stairs climbed from midnight through now.
+    func fetchTodayFlightsClimbed() async throws -> Int {
+        Int(try await fetchTodayCumulativeSum(for: flightsType, unit: .count()))
+    }
+
+    /// Apple's "exercise minutes" from midnight through now — the closest available proxy
+    /// for sustained active walking/running time.
+    func fetchTodayActiveMinutes() async throws -> Int {
+        Int(try await fetchTodayCumulativeSum(for: exerciseTimeType, unit: .minute()))
+    }
+
+    private func fetchTodayCumulativeSum(for quantityType: HKQuantityType, unit: HKUnit) async throws -> Double {
+        let predicate = HKQuery.predicateForSamples(
+            withStart: Calendar.current.startOfDay(for: .now),
+            end: .now,
+            options: .strictStartDate
+        )
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKStatisticsQuery(
+                quantityType: quantityType,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum
+            ) { _, statistics, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                continuation.resume(returning: statistics?.sumQuantity()?.doubleValue(for: unit) ?? 0)
+            }
+            healthStore.execute(query)
+        }
+    }
+
+    /// One day-by-day total per calendar day for the trailing `days` days (including today) —
+    /// the shared engine behind the Stats screen's Week/Month charts for steps, distance,
+    /// active calories, flights, and exercise minutes alike.
+    func fetchDailyTotals(for metric: HealthMetricKind, days: Int) async throws -> [Date: Double] {
+        let (quantityType, unit) = quantityTypeAndUnit(for: metric)
+        let calendar = Calendar.current
+        let startDate = calendar.date(byAdding: .day, value: -(days - 1), to: calendar.startOfDay(for: .now)) ?? .now
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: .now, options: .strictStartDate)
+        var interval = DateComponents()
+        interval.day = 1
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKStatisticsCollectionQuery(
+                quantityType: quantityType,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum,
+                anchorDate: startDate,
+                intervalComponents: interval
+            )
+
+            query.initialResultsHandler = { _, results, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let results else {
+                    continuation.resume(returning: [:])
+                    return
+                }
+
+                var totals: [Date: Double] = [:]
+                results.enumerateStatistics(from: startDate, to: .now) { statistics, _ in
+                    let day = calendar.startOfDay(for: statistics.startDate)
+                    totals[day] = statistics.sumQuantity()?.doubleValue(for: unit) ?? 0
+                }
+                continuation.resume(returning: totals)
+            }
+
+            healthStore.execute(query)
+        }
+    }
+
+    private func quantityTypeAndUnit(for metric: HealthMetricKind) -> (HKQuantityType, HKUnit) {
+        switch metric {
+        case .steps: return (stepType, .count())
+        case .distance: return (distanceType, .meter())
+        case .activeCalories: return (activeEnergyType, .kilocalorie())
+        case .flightsClimbed: return (flightsType, .count())
+        case .activeMinutes: return (exerciseTimeType, .minute())
+        }
+    }
+
     /// Steps bucketed by hour, from midnight through now, for the intraday trend line.
     func fetchTodayHourlySteps() async throws -> [HourlyStepBucket] {
         let calendar = Calendar.current
@@ -232,12 +332,19 @@ final class HealthKitManager {
             async let steps = fetchTodaySteps()
             async let distance = fetchTodayDistanceMeters()
             async let hourly = fetchTodayHourlySteps()
+            async let calories = fetchTodayActiveCalories()
+            async let flights = fetchTodayFlightsClimbed()
+            async let activeMinutes = fetchTodayActiveMinutes()
 
-            let (resolvedSteps, resolvedDistance, resolvedHourly) = try await (steps, distance, hourly)
+            let (resolvedSteps, resolvedDistance, resolvedHourly, resolvedCalories, resolvedFlights, resolvedActiveMinutes) =
+                try await (steps, distance, hourly, calories, flights, activeMinutes)
 
             todaySteps = resolvedSteps
             todayDistanceMeters = resolvedDistance
             todayHourlyTrend = HourlyStepSnapshot.cumulativeSnapshots(from: resolvedHourly)
+            todayActiveCalories = resolvedCalories
+            todayFlightsClimbed = resolvedFlights
+            todayActiveMinutes = resolvedActiveMinutes
             lastSyncedAt = .now
             lastError = nil
         } catch {

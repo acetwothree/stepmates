@@ -16,6 +16,16 @@ enum CloudKitSyncError: Error, Sendable {
     case notPaired
 }
 
+/// One device's today-so-far totals, pushed as a unit so a single write always carries a
+/// consistent snapshot instead of racing partial updates for each metric.
+struct StepPushPayload: Sendable {
+    var steps: Int
+    var distance: Double
+    var activeCalories: Double
+    var flightsClimbed: Int
+    var activeMinutes: Int
+}
+
 /// Owns every CloudKit interaction: room creation, sharing, the passive step push, and the
 /// remote-notification-driven refresh that keeps both partners' devices in sync.
 @MainActor
@@ -46,7 +56,7 @@ final class CloudKitSyncEngine {
     private var zoneID: CKRecordZone.ID?
     private var cachedMemberRecord: CKRecord?
     private var pushDebounceTask: Task<Void, Never>?
-    private var offlineStepQueue: (steps: Int, distance: Double)?
+    private var offlineStepQueue: StepPushPayload?
 
     private init() {
         restorePersistedPairing()
@@ -89,6 +99,9 @@ final class CloudKitSyncEngine {
             memberRecord[MemberField.displayName] = (displayName?.isEmpty == false ? displayName! : UIDevice.current.name) as CKRecordValue
             memberRecord[MemberField.currentSteps] = 0 as CKRecordValue
             memberRecord[MemberField.todayDistance] = 0.0 as CKRecordValue
+            memberRecord[MemberField.todayActiveCalories] = 0.0 as CKRecordValue
+            memberRecord[MemberField.todayFlightsClimbed] = 0 as CKRecordValue
+            memberRecord[MemberField.todayActiveMinutes] = 0 as CKRecordValue
             memberRecord[MemberField.lastSyncedAt] = Date.now as CKRecordValue
 
             // CloudKit data lives in the user's iCloud account, not on-device — a previous
@@ -185,6 +198,9 @@ final class CloudKitSyncEngine {
             record[MemberField.displayName] = displayName as CKRecordValue
             record[MemberField.currentSteps] = 0 as CKRecordValue
             record[MemberField.todayDistance] = 0.0 as CKRecordValue
+            record[MemberField.todayActiveCalories] = 0.0 as CKRecordValue
+            record[MemberField.todayFlightsClimbed] = 0 as CKRecordValue
+            record[MemberField.todayActiveMinutes] = 0 as CKRecordValue
             record[MemberField.lastSyncedAt] = Date.now as CKRecordValue
 
             let saved = try await activeDatabase.save(record)
@@ -237,15 +253,18 @@ final class CloudKitSyncEngine {
 
     // MARK: Passive step sync
 
-    /// Immediately writes this device's latest steps to its `MemberStateRecord`. Queues the
-    /// delta locally on network failure instead of throwing it away.
-    func pushLocalSteps(_ steps: Int, distance: Double) async throws {
+    /// Immediately writes this device's latest today-so-far totals to its `MemberStateRecord`.
+    /// Queues the payload locally on network failure instead of throwing it away.
+    func pushLocalSteps(_ payload: StepPushPayload) async throws {
         guard pairingState == .paired else { return }
 
         do {
             let record = try await loadOrCreateMemberRecord()
-            record[MemberField.currentSteps] = steps as CKRecordValue
-            record[MemberField.todayDistance] = distance as CKRecordValue
+            record[MemberField.currentSteps] = payload.steps as CKRecordValue
+            record[MemberField.todayDistance] = payload.distance as CKRecordValue
+            record[MemberField.todayActiveCalories] = payload.activeCalories as CKRecordValue
+            record[MemberField.todayFlightsClimbed] = payload.flightsClimbed as CKRecordValue
+            record[MemberField.todayActiveMinutes] = payload.activeMinutes as CKRecordValue
             record[MemberField.lastSyncedAt] = Date.now as CKRecordValue
 
             let saved = try await activeDatabase.save(record)
@@ -256,7 +275,7 @@ final class CloudKitSyncEngine {
             lastSyncedAt = .now
         } catch let error as CKError where error.code == .networkUnavailable || error.code == .networkFailure {
             isOffline = true
-            offlineStepQueue = (steps, distance)
+            offlineStepQueue = payload
             lastError = error
         } catch {
             handle(error)
@@ -266,12 +285,12 @@ final class CloudKitSyncEngine {
 
     /// Debounced entry point for HealthKit-driven updates — coalesces rapid successive step
     /// deltas into a single CloudKit write instead of hammering the network on every tick.
-    func schedulePushLocalSteps(_ steps: Int, distance: Double) {
+    func schedulePushLocalSteps(_ payload: StepPushPayload) {
         pushDebounceTask?.cancel()
         pushDebounceTask = Task {
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else { return }
-            try? await pushLocalSteps(steps, distance: distance)
+            try? await pushLocalSteps(payload)
         }
     }
 
@@ -279,7 +298,7 @@ final class CloudKitSyncEngine {
     /// (e.g. on a remote-notification wake, when connectivity has likely returned).
     func retryQueuedStepsIfNeeded() async {
         guard let offlineStepQueue else { return }
-        try? await pushLocalSteps(offlineStepQueue.steps, distance: offlineStepQueue.distance)
+        try? await pushLocalSteps(offlineStepQueue)
     }
 
     // MARK: Subscriptions & remote notifications
@@ -477,6 +496,9 @@ private enum MemberField {
     static let displayName = "displayName"
     static let currentSteps = "currentSteps"
     static let todayDistance = "todayDistance"
+    static let todayActiveCalories = "todayActiveCalories"
+    static let todayFlightsClimbed = "todayFlightsClimbed"
+    static let todayActiveMinutes = "todayActiveMinutes"
     static let lastSyncedAt = "lastSyncedAt"
     static let lastNudgeTimestamp = "lastNudgeTimestamp"
 }
@@ -505,6 +527,9 @@ private extension MemberSnapshot {
         self.displayName = displayName
         currentSteps = record[MemberField.currentSteps] as? Int ?? 0
         todayDistance = record[MemberField.todayDistance] as? Double ?? 0
+        todayActiveCalories = record[MemberField.todayActiveCalories] as? Double ?? 0
+        todayFlightsClimbed = record[MemberField.todayFlightsClimbed] as? Int ?? 0
+        todayActiveMinutes = record[MemberField.todayActiveMinutes] as? Int ?? 0
         lastSyncedAt = record[MemberField.lastSyncedAt] as? Date ?? .now
         lastNudgeTimestamp = record[MemberField.lastNudgeTimestamp] as? Date
     }

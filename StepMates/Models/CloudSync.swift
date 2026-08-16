@@ -44,6 +44,9 @@ struct MemberSnapshot: Equatable, Sendable {
     var displayName: String
     var currentSteps: Int
     var todayDistance: Double
+    var todayActiveCalories: Double
+    var todayFlightsClimbed: Int
+    var todayActiveMinutes: Int
     var lastSyncedAt: Date
     var lastNudgeTimestamp: Date?
 }

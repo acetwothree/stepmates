@@ -39,6 +39,9 @@ struct HomeViewModelTests {
             displayName: "Partner",
             currentSteps: 0,
             todayDistance: 0,
+            todayActiveCalories: 0,
+            todayFlightsClimbed: 0,
+            todayActiveMinutes: 0,
             lastSyncedAt: .now,
             lastNudgeTimestamp: nil
         )
