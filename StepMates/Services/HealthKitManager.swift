@@ -264,8 +264,9 @@ final class HealthKitManager {
                 completionHandler()
                 return
             }
-            Task {
-                await HealthKitManager.shared.handleObserverUpdate(completionHandler: completionHandler)
+            Task { @MainActor in
+                await HealthKitManager.shared.handleObserverUpdate()
+                completionHandler()
             }
         }
 
@@ -275,31 +276,21 @@ final class HealthKitManager {
     }
 
     /// Runs on every observer fire, including background launches. Wraps the fetch in a
-    /// UIKit background task so iOS grants enough runtime to finish before suspending us,
-    /// and always calls the HealthKit completion handler — skipping it repeatedly throttles
-    /// future background delivery for this app.
-    private func handleObserverUpdate(completionHandler: @escaping HKObserverQueryCompletionHandler) async {
-        // The expiration closure UIApplication hands us is a plain @Sendable () -> Void,
-        // not MainActor-isolated — but UIApplication.shared itself is. Snapshot `taskID`
-        // into an immutable local before crossing into a Task { @MainActor in }; sending
-        // that plain Sendable value across is fine, only touching `UIApplication.shared`
-        // directly from the non-isolated closure body was ever the problem.
-        var taskID: UIBackgroundTaskIdentifier = .invalid
-        taskID = UIApplication.shared.beginBackgroundTask(withName: "StepMatesHealthSync") {
-            let currentID = taskID
-            Task { @MainActor in
-                if currentID != .invalid {
-                    UIApplication.shared.endBackgroundTask(currentID)
-                }
-            }
+    /// UIKit background task so iOS grants enough runtime to finish before suspending us.
+    /// The caller is responsible for calling the HealthKit completion handler once this
+    /// returns — skipping it repeatedly throttles future background delivery for this app.
+    private func handleObserverUpdate() async {
+        var bgTask: UIBackgroundTaskIdentifier = .invalid
+        bgTask = UIApplication.shared.beginBackgroundTask(withName: "StepMatesHealthSync") {
+            UIApplication.shared.endBackgroundTask(bgTask)
+            bgTask = .invalid
         }
 
         await refreshTodayStats()
-        completionHandler()
 
-        if taskID != .invalid {
-            UIApplication.shared.endBackgroundTask(taskID)
-            taskID = .invalid
+        if bgTask != .invalid {
+            UIApplication.shared.endBackgroundTask(bgTask)
+            bgTask = .invalid
         }
     }
 
