@@ -401,6 +401,100 @@ final class CloudKitSyncEngine {
         }
     }
 
+    // MARK: Settings & debug
+
+    /// Updates this device's own display name, both locally and on the shared record so the
+    /// partner's next refresh picks it up.
+    func updateMyDisplayName(_ name: String) async {
+        do {
+            let record = try await loadOrCreateMemberRecord()
+            record[MemberField.displayName] = name as CKRecordValue
+            let saved = try await activeDatabase.save(record)
+            cachedMemberRecord = saved
+            mySnapshot = MemberSnapshot(record: saved)
+        } catch {
+            handle(error)
+        }
+    }
+
+    /// Updates the shared daily step goal on the Room record.
+    func updateMyDailyGoal(_ goal: Int) async {
+        guard let zoneID else { return }
+        do {
+            let roomID = CKRecord.ID(recordName: "Room", zoneID: zoneID)
+            let record = try await activeDatabase.record(for: roomID)
+            record[RoomField.targetGoal] = goal as CKRecordValue
+            record[RoomField.updatedAt] = Date.now as CKRecordValue
+            let saved = try await activeDatabase.save(record)
+            roomSnapshot = RoomSnapshot(record: saved)
+        } catch {
+            handle(error)
+        }
+    }
+
+    /// Forgets this device's pairing without touching the shared CloudKit zone — the regular,
+    /// non-destructive "Unlink Partner" action. If this device is the zone owner, the partner's
+    /// own device keeps its access until they separately leave or the owner revokes the share;
+    /// this only ever affects the local device's view of the pairing.
+    func unlinkPartnerLocally() {
+        zoneID = nil
+        role = nil
+        cachedMemberRecord = nil
+        roomSnapshot = nil
+        partnerSnapshot = nil
+        mySnapshot = nil
+        pairingState = .unpaired
+        clearPersistedPairing()
+    }
+
+    /// Debug-only: deletes the shared zone outright (only possible as the zone owner — a
+    /// partner has no permission to delete a zone they don't own) before forgetting the local
+    /// pairing. Unlike `unlinkPartnerLocally`, this actually destroys the shared room/member
+    /// data for both sides.
+    func debugClearCloudState() async {
+        if role == .owner, let zoneID {
+            do {
+                _ = try await privateDatabase.modifyRecordZones(saving: [], deleting: [zoneID])
+            } catch {
+                handle(error)
+            }
+        }
+        unlinkPartnerLocally()
+    }
+
+    /// Debug-only: writes a plausible step count directly to the *other* role's member record
+    /// so pairing/comparison UI can be exercised from a single device without a second phone.
+    func debugSimulatePartnerSteps() async {
+        guard let zoneID, let role else { return }
+        let partnerRole: PairingRole = role == .owner ? .partner : .owner
+        let partnerMemberID = CKRecord.ID(recordName: "Member-\(partnerRole.rawValue)", zoneID: zoneID)
+
+        do {
+            let record: CKRecord
+            if let existing = try? await activeDatabase.record(for: partnerMemberID) {
+                record = existing
+            } else {
+                record = CKRecord(recordType: RecordType.memberState, recordID: partnerMemberID)
+                record[MemberField.userRecordID] = "debug-simulated-partner" as CKRecordValue
+                record[MemberField.displayName] = "Test Partner" as CKRecordValue
+            }
+
+            let currentSteps = record[MemberField.currentSteps] as? Int ?? 0
+            let newSteps = min(currentSteps + Int.random(in: 500...1_500), 25_000)
+            record[MemberField.currentSteps] = newSteps as CKRecordValue
+            record[MemberField.todayDistance] = (Double(newSteps) * 0.78) as CKRecordValue
+            record[MemberField.todayActiveCalories] = (Double(newSteps) * 0.04) as CKRecordValue
+            record[MemberField.todayFlightsClimbed] = Int.random(in: 0...12) as CKRecordValue
+            record[MemberField.todayActiveMinutes] = Int(Double(newSteps) / 100) as CKRecordValue
+            record[MemberField.lastSyncedAt] = Date.now as CKRecordValue
+
+            let saved = try await activeDatabase.save(record)
+            partnerSnapshot = MemberSnapshot(record: saved)
+        } catch {
+            handle(error)
+        }
+    }
+
     // MARK: Helpers
 
     private func loadOrCreateMemberRecord() async throws -> CKRecord {

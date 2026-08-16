@@ -59,6 +59,9 @@ struct HomeView: View {
                 partnerSnapshot: viewModel.cloudKitSyncEngine.partnerSnapshot
             )
         }
+        .sheet(isPresented: $viewModel.showSettings) {
+            SettingsView(viewModel: viewModel)
+        }
         .onAppear {
             viewModel.presentRecapIfNeeded()
         }
@@ -80,7 +83,9 @@ struct HomeView: View {
                 circularIconButton(systemName: "chart.bar.fill") {
                     viewModel.showStats = true
                 }
-                circularIconButton(systemName: "gearshape.fill") {}
+                circularIconButton(systemName: "gearshape.fill") {
+                    viewModel.showSettings = true
+                }
             }
         }
         .padding(.top, 8)

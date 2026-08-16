@@ -45,8 +45,12 @@ enum HealthMetricKind: String, CaseIterable, Identifiable, Sendable {
         case .steps, .flightsClimbed:
             return Int(value.rounded()).formatted()
         case .distance:
-            let miles = value / 1_609.34
-            return String(format: "%.1f mi", miles)
+            switch UnitPreferences.distanceUnit {
+            case .miles:
+                return String(format: "%.1f mi", value / 1_609.34)
+            case .kilometers:
+                return String(format: "%.1f km", value / 1_000)
+            }
         case .activeCalories:
             return "\(Int(value.rounded())) kcal"
         case .activeMinutes:

@@ -28,4 +28,8 @@ enum OnboardingProfileStore {
         guard let data = UserDefaults.standard.data(forKey: defaultsKey) else { return nil }
         return try? JSONDecoder().decode(OnboardingProfile.self, from: data)
     }
+
+    static func clear() {
+        UserDefaults.standard.removeObject(forKey: defaultsKey)
+    }
 }

@@ -25,6 +25,7 @@ final class HomeViewModel {
     var showCreateWagerSheet = false
     var showWeeklyRecap = false
     var showStats = false
+    var showSettings = false
 
     private var nudgeClearTask: Task<Void, Never>?
     private var hasOfferedRecapThisSession = false

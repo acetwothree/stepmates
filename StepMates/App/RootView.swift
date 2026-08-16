@@ -15,23 +15,18 @@ struct RootView: View {
 
     /// Decided once, synchronously, from whatever state each singleton already has at
     /// launch (CloudKitSyncEngine restores persisted pairing synchronously in its own
-    /// init, so this is usually accurate immediately). Deliberately NOT a computed property
-    /// re-evaluated on every render — see OnboardingFlowView's header comment for why:
-    /// reactively watching pairingState/authorizationStatus here would reproduce the exact
-    /// same "navigated away mid-flow" bug at the root level instead of inside the flow.
-    @State private var isOnboarding: Bool
-
-    init() {
-        let hk = HealthKitManager.shared
-        let ck = CloudKitSyncEngine.shared
-        _isOnboarding = State(initialValue: hk.authorizationStatus == .notDetermined || ck.pairingState == .unpaired)
-    }
+    /// init, so this is usually accurate immediately) — see AppFlowCoordinator. Deliberately
+    /// NOT a computed property re-evaluated on every render — see OnboardingFlowView's header
+    /// comment for why: reactively watching pairingState/authorizationStatus here would
+    /// reproduce the exact same "navigated away mid-flow" bug at the root level instead of
+    /// inside the flow.
+    @State private var flow = AppFlowCoordinator.shared
 
     var body: some View {
         Group {
-            if isOnboarding {
+            if flow.isOnboarding {
                 OnboardingFlowView(healthKitManager: healthKitManager, cloudKitSyncEngine: cloudKitSyncEngine) {
-                    isOnboarding = false
+                    flow.isOnboarding = false
                 }
             } else {
                 HomeView()
@@ -45,10 +40,10 @@ struct RootView: View {
             // .notDetermined default at the synchronous init() check above, corrected once
             // bootstrap resolves it. Never flips the other way: once false (or once the
             // user is inside the flow), later state changes don't reopen onboarding.
-            if isOnboarding,
+            if flow.isOnboarding,
                healthKitManager.authorizationStatus != .notDetermined,
                cloudKitSyncEngine.pairingState != .unpaired {
-                isOnboarding = false
+                flow.isOnboarding = false
             }
         }
     }
