@@ -30,7 +30,7 @@ struct PartnerActionBar: View {
                 }
 
                 actionButton(
-                    title: "Edit Today's Wager",
+                    title: "Edit Wagers",
                     emoji: "⚡️",
                     gradient: SweatmatesColors.limeGradient
                 ) {

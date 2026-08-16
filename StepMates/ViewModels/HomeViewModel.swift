@@ -207,6 +207,18 @@ final class HomeViewModel {
         }
     }
 
+    /// Forces a fresh pull from both HealthKit and CloudKit — called every time Home appears,
+    /// not just relying on the one-shot fetch from onboarding's authorization request. That
+    /// one-shot fetch has no retry path if it silently fails (network hiccup, HealthKit not
+    /// fully warmed up on a genuinely first launch), and the HealthKit observer only fires on
+    /// *new* samples — so if the user already had steps logged before ever opening the app and
+    /// takes no further steps while it's foregrounded, a failed initial fetch would otherwise
+    /// never self-correct.
+    func refreshAll() async {
+        await healthKitManager.refreshTodayStats()
+        await cloudKitSyncEngine.refreshFromCloud()
+    }
+
     func addWager(_ wager: Wager) {
         HapticService.shared.wagerLock()
         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {

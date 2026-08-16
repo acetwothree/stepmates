@@ -93,20 +93,22 @@ struct ConsistencyStepView: View {
                 "Willpower alone": SweatmatesColors.textTertiary,
             ])
             .chartLegend(.hidden)
-            .chartXAxis {
-                AxisMarks(values: [0, 2]) { value in
-                    AxisValueLabel {
-                        if let month = value.as(Int.self) {
-                            Text(month == 0 ? "Month 1" : "Month 3")
-                                .font(SweatmatesTypography.caption(11))
-                                .foregroundStyle(SweatmatesColors.textOnCardSecondary)
-                        }
-                    }
-                }
-            }
+            .chartXAxis(.hidden)
             .chartYAxis(.hidden)
             .chartYScale(domain: 0...100)
-            .frame(height: 190)
+            .frame(height: 180)
+
+            // Manual labels instead of AxisMarks at the plot's exact left/right edges — Swift
+            // Charts clips or drops axis value labels positioned right at the boundary, which
+            // was silently swallowing "Month 3" on the right. Plain text below the chart has
+            // no such edge case.
+            HStack {
+                Text("Month 1")
+                Spacer()
+                Text("Month 3")
+            }
+            .font(SweatmatesTypography.caption(11))
+            .foregroundStyle(SweatmatesColors.textOnCardSecondary)
         }
         .padding(20)
         .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(SweatmatesColors.cardSurface))

@@ -64,6 +64,7 @@ struct HomeView: View {
         }
         .onAppear {
             viewModel.presentRecapIfNeeded()
+            Task { await viewModel.refreshAll() }
         }
     }
 

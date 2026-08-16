@@ -141,6 +141,16 @@ final class CloudKitSyncEngine {
                 savePolicy: .allKeys
             )
 
+            // Surface the *real* per-record failure reason rather than the opaque
+            // .shareSaveFailed fallback — modifyRecords can fail an individual item (e.g. the
+            // record type genuinely doesn't exist in this CloudKit environment yet) without
+            // throwing at the batch level, and swallowing that into a generic error made this
+            // undiagnosable from the field.
+            for recordID in [roomRecord.recordID, memberRecord.recordID, share.recordID] {
+                if case .failure(let saveError) = saveResults[recordID] {
+                    throw saveError
+                }
+            }
             guard case .success(let savedShareRecord) = saveResults[share.recordID],
                   let savedShare = savedShareRecord as? CKShare else {
                 throw CloudKitSyncError.shareSaveFailed
