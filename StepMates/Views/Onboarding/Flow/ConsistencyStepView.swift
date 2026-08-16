@@ -3,7 +3,9 @@
 //  StepMates
 //
 //  "StepMates creates long-term consistency" — the with/without comparison chart, adapted
-//  from Sweatmates' workout-streak framing to a step-streak one.
+//  from Sweatmates' workout-streak framing to a step-streak one. Both lines start flat and
+//  animate apart on appear (orange rising, grey falling), with an explicit legend since
+//  Swift Charts' auto-legend was hidden for layout reasons.
 //
 
 import Charts
@@ -20,14 +22,18 @@ struct ConsistencyStepView: View {
     var onContinue: () -> Void
     var onBack: () -> Void
 
-    private let data: [ConsistencyPoint] = [
-        ConsistencyPoint(series: "With StepMates", month: 0, value: 68),
-        ConsistencyPoint(series: "With StepMates", month: 1, value: 78),
-        ConsistencyPoint(series: "With StepMates", month: 2, value: 92),
-        ConsistencyPoint(series: "Willpower alone", month: 0, value: 68),
-        ConsistencyPoint(series: "Willpower alone", month: 1, value: 38),
-        ConsistencyPoint(series: "Willpower alone", month: 2, value: 16),
-    ]
+    @State private var hasAnimated = false
+
+    private var data: [ConsistencyPoint] {
+        let withStepMates = hasAnimated ? [68.0, 78.0, 92.0] : [68.0, 68.0, 68.0]
+        let willpowerAlone = hasAnimated ? [68.0, 38.0, 16.0] : [68.0, 68.0, 68.0]
+        return (0...2).flatMap { month in
+            [
+                ConsistencyPoint(series: "With StepMates", month: month, value: withStepMates[month]),
+                ConsistencyPoint(series: "Willpower alone", month: month, value: willpowerAlone[month]),
+            ]
+        }
+    }
 
     var body: some View {
         OnboardingScaffold(progress: OnboardingStep.consistency.progress, onBack: onBack) {
@@ -58,13 +64,20 @@ struct ConsistencyStepView: View {
         } footer: {
             OnboardingCTAButton(title: "See how it works", action: onContinue)
         }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.4).delay(0.3)) {
+                hasAnimated = true
+            }
+        }
     }
 
     private var chartCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Your consistency")
                 .font(SweatmatesTypography.headline(16, weight: .bold))
                 .foregroundStyle(SweatmatesColors.textOnCard)
+
+            legend
 
             Chart(data) { point in
                 LineMark(
@@ -92,10 +105,28 @@ struct ConsistencyStepView: View {
                 }
             }
             .chartYAxis(.hidden)
-            .frame(height: 200)
+            .chartYScale(domain: 0...100)
+            .frame(height: 190)
         }
         .padding(20)
         .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(SweatmatesColors.cardSurface))
+    }
+
+    private var legend: some View {
+        HStack(spacing: 18) {
+            legendItem(color: SweatmatesColors.accentFlame, label: "With StepMates")
+            legendItem(color: SweatmatesColors.textTertiary, label: "Willpower alone")
+            Spacer()
+        }
+    }
+
+    private func legendItem(color: Color, label: String) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(label)
+                .font(SweatmatesTypography.caption(12, weight: .semibold))
+                .foregroundStyle(SweatmatesColors.textOnCardSecondary)
+        }
     }
 }
 

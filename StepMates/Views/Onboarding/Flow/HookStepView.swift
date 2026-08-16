@@ -4,8 +4,8 @@
 //
 //  The cold-open pain-point screen — no chrome, no progress bar, just the hook. Adapted
 //  from Sweatmates' "Day 1 vs 1 week later" workout illustration into a steps framing.
-//  Illustrated with SF Symbols (matching the rest of the app's icon language) rather than
-//  custom character art.
+//  Illustrated with two drawn scenes (OnboardingDay1 / OnboardingWeekLater in
+//  Assets.xcassets) showing the same couple walking together vs. slumped on the couch.
 //
 
 import SwiftUI
@@ -48,49 +48,35 @@ struct HookStepView: View {
     }
 
     private var comparisonCard: some View {
-        HStack(spacing: 0) {
-            comparisonColumn(
-                label: "Day 1",
-                icon: "figure.walk",
-                marks: [true, true, true],
-                tint: SweatmatesColors.accentLimeDeep
-            )
-            Rectangle()
-                .fill(SweatmatesColors.divider)
-                .frame(width: 1)
-                .padding(.vertical, 24)
-            comparisonColumn(
-                label: "1 Week Later",
-                icon: "figure.seated.side",
-                marks: [false, false, false],
-                tint: SweatmatesColors.danger
-            )
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                comparisonColumn(label: "Day 1", imageName: "OnboardingDay1")
+                Rectangle()
+                    .fill(SweatmatesColors.divider)
+                    .frame(width: 1)
+                comparisonColumn(label: "1 Week Later", imageName: "OnboardingWeekLater")
+            }
         }
-        .padding(.vertical, 28)
         .background(RoundedRectangle(cornerRadius: 26, style: .continuous).fill(SweatmatesColors.cardSurface))
         .padding(.horizontal, 24)
     }
 
-    private func comparisonColumn(label: String, icon: String, marks: [Bool], tint: Color) -> some View {
-        VStack(spacing: 16) {
+    private func comparisonColumn(label: String, imageName: String) -> some View {
+        VStack(spacing: 10) {
             Text(label)
-                .font(SweatmatesTypography.headline(15, weight: .bold))
+                .font(SweatmatesTypography.headline(14, weight: .bold))
                 .foregroundStyle(SweatmatesColors.textOnCard)
+                .padding(.top, 16)
 
-            HStack(spacing: 6) {
-                ForEach(marks.indices, id: \.self) { index in
-                    Image(systemName: marks[index] ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(tint)
-                }
-            }
-
-            Image(systemName: icon)
-                .font(.system(size: 44, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(height: 56)
+            Image(imageName)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(height: 130)
+                .frame(maxWidth: .infinity)
+                .clipped()
         }
         .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 }
 

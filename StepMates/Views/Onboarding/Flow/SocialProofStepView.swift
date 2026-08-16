@@ -3,7 +3,8 @@
 //  StepMates
 //
 //  "See each other show up" — social proof before asking for HealthKit/partner commitments.
-//  Uses a generic placeholder avatar rather than a fabricated "real" partner photo.
+//  Uses a stylized illustrated "selfie" (OnboardingPartnerSelfie) rather than a fabricated
+//  "real" partner photo. Both step bars count up from 0 on appear.
 //
 
 import SwiftUI
@@ -11,6 +12,9 @@ import SwiftUI
 struct SocialProofStepView: View {
     var onContinue: () -> Void
     var onBack: () -> Void
+
+    @State private var animatedSteps: Double = 0
+    private let targetSteps: Double = 70_000
 
     var body: some View {
         OnboardingScaffold(progress: OnboardingStep.socialProof.progress, onBack: onBack) {
@@ -33,6 +37,11 @@ struct SocialProofStepView: View {
         } footer: {
             OnboardingCTAButton(title: "Continue", action: onContinue)
         }
+        .onAppear {
+            withAnimation(.easeOut(duration: 1.6).delay(0.2)) {
+                animatedSteps = targetSteps
+            }
+        }
     }
 
     private var partnerCardStack: some View {
@@ -44,28 +53,20 @@ struct SocialProofStepView: View {
                     .rotationEffect(.degrees(offset))
             }
 
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(SweatmatesColors.limeGradient)
+            Image("OnboardingPartnerSelfie")
+                .resizable()
+                .aspectRatio(contentMode: .fill)
                 .frame(width: 220, height: 260)
-                .overlay(
-                    VStack {
-                        Spacer()
-                        Image(systemName: "figure.walk.circle.fill")
-                            .font(.system(size: 64))
-                            .foregroundStyle(.white.opacity(0.9))
-                        Spacer()
-                        HStack {
-                            Text("Partner")
-                                .font(SweatmatesTypography.caption(11, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(Capsule().fill(.black.opacity(0.35)))
-                            Spacer()
-                        }
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(alignment: .bottomLeading) {
+                    Text("Partner")
+                        .font(SweatmatesTypography.caption(11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(.black.opacity(0.35)))
                         .padding(12)
-                    }
-                )
+                }
         }
         .padding(.vertical, 12)
     }
@@ -85,14 +86,14 @@ struct SocialProofStepView: View {
                     .background(Capsule().fill(SweatmatesColors.accentFlame.opacity(0.14)))
             }
 
-            progressRow(label: "You", initials: "ME", tint: .blue, fraction: 1.0)
-            progressRow(label: "Partner", initials: "PA", tint: SweatmatesColors.accentFlame, fraction: 1.0)
+            progressRow(label: "You", initials: "ME", tint: .blue)
+            progressRow(label: "Partner", initials: "PA", tint: SweatmatesColors.accentFlame)
         }
         .padding(18)
         .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(SweatmatesColors.cardSurface))
     }
 
-    private func progressRow(label: String, initials: String, tint: Color, fraction: Double) -> some View {
+    private func progressRow(label: String, initials: String, tint: Color) -> some View {
         HStack(spacing: 12) {
             Circle()
                 .fill(tint)
@@ -109,15 +110,32 @@ struct SocialProofStepView: View {
                     .overlay(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(SweatmatesColors.accentLimeDeep)
-                            .frame(width: geometry.size.width * fraction)
+                            .frame(width: geometry.size.width * (animatedSteps / targetSteps))
                     }
             }
             .frame(height: 8)
 
-            Text("3/3")
-                .font(SweatmatesTypography.caption(12, weight: .bold))
+            AnimatableStepCountText(value: animatedSteps)
+                .font(SweatmatesTypography.caption(11, weight: .bold))
                 .foregroundStyle(SweatmatesColors.accentLimeDeep)
+                .frame(width: 58, alignment: .trailing)
         }
+    }
+}
+
+/// Text content doesn't interpolate under `withAnimation` the way geometry does — this is
+/// the standard `Animatable` trick to get a genuine frame-by-frame counting effect instead
+/// of a snap or a digit-roll transition.
+private struct AnimatableStepCountText: View, Animatable {
+    var value: Double
+
+    var animatableData: Double {
+        get { value }
+        set { value = newValue }
+    }
+
+    var body: some View {
+        Text(Int(value).formatted())
     }
 }
 

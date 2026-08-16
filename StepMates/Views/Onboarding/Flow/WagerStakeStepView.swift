@@ -5,6 +5,11 @@
 //  "Wager if you don't meet your weekly goal?" — presets mirror CreateWagerSheet's so the
 //  vocabulary is consistent once the user reaches the full wager-creation flow later.
 //
+//  The custom-stake TextField sits on `cardSurfaceElevated`, which stays a light cream card
+//  in both light AND dark mode — so its text must use `textOnCard` (always dark), not
+//  `textPrimary` (which flips to near-white in dark mode and becomes unreadable). Tapping
+//  "Create Your Own" also auto-focuses the field and scrolls it above the keyboard.
+//
 
 import SwiftUI
 
@@ -13,34 +18,53 @@ struct WagerStakeStepView: View {
     var onContinue: () -> Void
     var onBack: () -> Void
 
+    @FocusState private var isCustomStakeFocused: Bool
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+    private let customFieldID = "customStakeField"
 
     var body: some View {
         OnboardingScaffold(progress: OnboardingStep.wagerStake.progress, onBack: onBack) {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Wager if you don't\nmeet your weekly goal?")
-                        .font(SweatmatesTypography.title(24, weight: .heavy))
-                        .foregroundStyle(SweatmatesColors.textPrimary)
-                    Text("If you miss your weekly goal you'll owe this.")
-                        .font(SweatmatesTypography.body(14))
-                        .foregroundStyle(SweatmatesColors.textSecondary)
-                }
+            ScrollViewReader { proxy in
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Wager if you don't\nmeet your weekly goal?")
+                            .font(SweatmatesTypography.title(24, weight: .heavy))
+                            .foregroundStyle(SweatmatesColors.textPrimary)
+                        Text("If you miss your weekly goal you'll owe this.")
+                            .font(SweatmatesTypography.body(14))
+                            .foregroundStyle(SweatmatesColors.textSecondary)
+                    }
 
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(OnboardingWagerStake.presets) { stake in
-                        stakeCard(stake)
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(OnboardingWagerStake.presets) { stake in
+                            stakeCard(stake)
+                        }
+                    }
+
+                    customStakeCard
+
+                    if state.selectedWagerStake?.id == OnboardingWagerStake.custom.id {
+                        TextField("e.g. massage, dessert, movie pick", text: $state.customWagerStake)
+                            .font(SweatmatesTypography.body(15))
+                            .padding(14)
+                            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(SweatmatesColors.cardSurfaceElevated))
+                            .foregroundStyle(SweatmatesColors.textOnCard)
+                            .tint(SweatmatesColors.accentFlame)
+                            .focused($isCustomStakeFocused)
+                            .id(customFieldID)
+                            // Extra breathing room so scrollTo(anchor: .bottom) can actually
+                            // lift the field clear of the keyboard instead of tucking it
+                            // right at the keyboard's top edge.
+                            .padding(.bottom, 260)
                     }
                 }
-
-                customStakeCard
-
-                if state.selectedWagerStake?.id == OnboardingWagerStake.custom.id {
-                    TextField("e.g. massage, dessert, movie pick", text: $state.customWagerStake)
-                        .font(SweatmatesTypography.body(15))
-                        .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(SweatmatesColors.cardSurfaceElevated))
-                        .foregroundStyle(SweatmatesColors.textPrimary)
+                .onChange(of: isCustomStakeFocused) { _, focused in
+                    guard focused else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            proxy.scrollTo(customFieldID, anchor: .bottom)
+                        }
+                    }
                 }
             }
         } footer: {
@@ -57,6 +81,7 @@ struct WagerStakeStepView: View {
         let isSelected = state.selectedWagerStake?.id == stake.id
         return Button {
             HapticService.shared.lightTap()
+            isCustomStakeFocused = false
             state.selectedWagerStake = stake
         } label: {
             VStack(spacing: 10) {
@@ -81,6 +106,9 @@ struct WagerStakeStepView: View {
         return Button {
             HapticService.shared.lightTap()
             state.selectedWagerStake = OnboardingWagerStake.custom
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                isCustomStakeFocused = true
+            }
         } label: {
             HStack(spacing: 14) {
                 ZStack {
