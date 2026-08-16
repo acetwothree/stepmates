@@ -20,7 +20,7 @@
 	<string>Apple Distribution</string>
 	<key>provisioningProfiles</key>
 	<dict>
-		<key>com.stepmates.app</key>
+		<key>com.acetwothree.stepmates</key>
 		<string>__PROVISIONING_PROFILE_UUID__</string>
 	</dict>
 

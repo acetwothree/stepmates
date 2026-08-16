@@ -5,3 +5,16 @@ xcuserdata/
 DerivedData/
 .build/
 *.swiftpm
+
+# Code-signing & App Store Connect secrets — never commit these. Generated locally while
+# following docs/TESTFLIGHT_SETUP.md; only the base64/contents pasted into GitHub Secrets
+# should ever leave this machine.
+*.p12
+*.p8
+*.cer
+*.csr
+*.key
+*.pem
+*.mobileprovision
+*.base64
+*.base64~

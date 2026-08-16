@@ -11,7 +11,7 @@ and github.com — no Mac required at any point.
 1. Go to **Certificates, Identifiers & Profiles → Identifiers → +**.
 2. Register a new **App ID**:
    - Type: **App**
-   - Bundle ID: **Explicit** — `com.stepmates.app` (must match `PRODUCT_BUNDLE_IDENTIFIER` in [project.yml](../project.yml) exactly)
+   - Bundle ID: **Explicit** — `com.acetwothree.stepmates` (must match `PRODUCT_BUNDLE_IDENTIFIER` in [project.yml](../project.yml) exactly)
 3. Under **Capabilities**, enable:
    - ☑ **HealthKit**
    - ☑ **iCloud** → check **CloudKit**
@@ -22,7 +22,7 @@ and github.com — no Mac required at any point.
 ## 2. CloudKit Container
 
 1. Still in **Identifiers**, open the App ID you just created → **iCloud** row → **Configure**.
-2. Choose **Create Container**, name it `iCloud.com.stepmates.app` (must exactly match
+2. Choose **Create Container**, name it `iCloud.com.acetwothree.stepmates` (must exactly match
    `com.apple.developer.icloud-container-identifiers` in
    [StepMates.entitlements](../StepMates/Resources/StepMates.entitlements)).
 3. Save. The container is created automatically the first time the app runs with a valid
@@ -56,14 +56,14 @@ have no Mac, the cleanest path is generating the CSR and cert entirely via the p
 ## 4. Provisioning Profile
 
 1. **Profiles → +** → **App Store** (under Distribution) → Continue.
-2. Select the `com.stepmates.app` App ID → Continue.
+2. Select the `com.acetwothree.stepmates` App ID → Continue.
 3. Select the distribution certificate from step 3 → Continue.
 4. Name it (e.g. `StepMates AppStore`) → Generate → Download the `.mobileprovision` file.
 
 ## 5. App Store Connect record
 
 1. In **App Store Connect → Apps → +**, create the app:
-   - Bundle ID: `com.stepmates.app` (select the App ID from step 1)
+   - Bundle ID: `com.acetwothree.stepmates` (select the App ID from step 1)
    - SKU: anything unique, e.g. `stepmates-ios`
 2. This is required before the first CI upload will succeed — `xcodebuild -exportArchive`
    with `destination: upload` uploads *to* an existing app record, it doesn't create one.
@@ -140,7 +140,7 @@ checked out at all.
 
 ### Common failure causes
 
-- **"No profiles for 'com.stepmates.app' were found"** — the bundle ID in the provisioning
+- **"No profiles for 'com.acetwothree.stepmates' were found"** — the bundle ID in the provisioning
   profile doesn't match `PRODUCT_BUNDLE_IDENTIFIER` in [project.yml](../project.yml), or the
   profile was generated before you enabled a capability (HealthKit/iCloud/Push) on the App ID
   — regenerate the profile after confirming all three capabilities are checked.
