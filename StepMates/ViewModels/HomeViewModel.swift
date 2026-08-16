@@ -22,11 +22,19 @@ final class HomeViewModel {
     var cloudKitSyncEngine: CloudKitSyncEngine
 
     var nudgeConfirmation: String?
-    var showCreateWagerSheet = false
     var showWeeklyRecap = false
     var showStats = false
     var showSettings = false
-    var showWagerLockedAlert = false
+
+    // Hamburger menu + the full-screen pages it opens. Every one of these is presented
+    // directly from HomeView (not nested inside the menu's own presentation), so dismissing
+    // any of them — back arrow or swipe/tap-out — always lands back on Home, never on an
+    // intermediate menu screen.
+    var showMenu = false
+    var showWeeklyRules = false
+    var showWagerBalance = false
+    var showPartnerPage = false
+    var showHistory = false
 
     private var nudgeClearTask: Task<Void, Never>?
     private var hasOfferedRecapThisSession = false
@@ -258,18 +266,6 @@ final class HomeViewModel {
         }
         Task {
             try? await cloudKitSyncEngine.updateActiveWager(wager)
-        }
-    }
-
-    /// The "Edit Wagers" entry point: opens the proposal sheet, unless a wager is already
-    /// locked in (both sides agreed) — that can't be edited until it resolves, so this just
-    /// explains why instead of letting the sheet quietly overwrite a wager the partner already
-    /// committed to.
-    func editWagersTapped() {
-        if let wager = activeWager, wager.isFullyAgreed {
-            showWagerLockedAlert = true
-        } else {
-            showCreateWagerSheet = true
         }
     }
 
