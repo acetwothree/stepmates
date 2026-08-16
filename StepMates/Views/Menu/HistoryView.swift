@@ -64,10 +64,10 @@ struct HistoryView: View {
                     .foregroundStyle(SweatmatesColors.textTertiary)
                 Text("No past weeks yet")
                     .font(SweatmatesTypography.body(15, weight: .semibold))
-                    .foregroundStyle(SweatmatesColors.textPrimary)
+                    .foregroundStyle(SweatmatesColors.textOnCard)
                 Text("Complete your first week to see your history here")
                     .font(SweatmatesTypography.caption(13))
-                    .foregroundStyle(SweatmatesColors.textSecondary)
+                    .foregroundStyle(SweatmatesColors.textOnCardSecondary)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)

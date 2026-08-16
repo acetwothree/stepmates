@@ -20,27 +20,27 @@ struct MenuDrawerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             profileRow
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 22)
                 .padding(.top, 20)
-                .padding(.bottom, 18)
+                .padding(.bottom, 20)
 
             Divider().overlay(SweatmatesColors.divider)
 
-            VStack(spacing: 2) {
+            VStack(spacing: 4) {
                 menuRow(icon: "list.bullet.rectangle.fill", title: "Weekly Rules", badge: "NEW", action: onSelectWeeklyRules)
                 menuRow(icon: "scalemass.fill", title: "Wager Balance", action: onSelectWagerBalance)
                 menuRow(icon: "heart.fill", title: "Partner", action: onSelectPartner)
                 menuRow(icon: "calendar", title: "History", action: onSelectHistory)
                 menuRow(icon: "gearshape.fill", title: "Settings", action: onSelectSettings)
             }
-            .padding(.top, 10)
+            .padding(.top, 12)
 
             Text("ACTIONS")
-                .font(SweatmatesTypography.microLabel(11))
+                .font(SweatmatesTypography.microLabel(12))
                 .foregroundStyle(SweatmatesColors.textTertiary)
-                .padding(.horizontal, 20)
-                .padding(.top, 26)
-                .padding(.bottom, 10)
+                .padding(.horizontal, 22)
+                .padding(.top, 28)
+                .padding(.bottom, 12)
 
             actionCard(
                 icon: "bell.fill",
@@ -50,7 +50,7 @@ struct MenuDrawerView: View {
             ) {
                 viewModel.sendNudge()
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
 
             Spacer(minLength: 20)
 
@@ -59,15 +59,19 @@ struct MenuDrawerView: View {
                 // Support isn't wired to anything yet — a placeholder tap target for now.
             } label: {
                 Label("Support", systemImage: "questionmark.circle.fill")
-                    .font(SweatmatesTypography.body(15, weight: .semibold))
+                    .font(SweatmatesTypography.body(17, weight: .semibold))
                     .foregroundStyle(SweatmatesColors.textSecondary)
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 18)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(SweatmatesColors.background)
+        // The background bleeds to the physical edges (including under the status bar /
+        // Dynamic Island) so there's no gap showing the app behind the drawer, but the
+        // content stack above it is NOT told to ignore safe areas — it lays out normally,
+        // so the profile row starts below the status bar instead of colliding with it.
+        .background(SweatmatesColors.background.ignoresSafeArea())
     }
 
     private var profileRow: some View {
@@ -75,30 +79,30 @@ struct MenuDrawerView: View {
             ZStack(alignment: .bottomTrailing) {
                 Circle()
                     .fill(SweatmatesColors.cardSurfaceElevated)
-                    .frame(width: 52, height: 52)
+                    .frame(width: 58, height: 58)
                     .overlay(
                         Text(initial)
-                            .font(SweatmatesTypography.headline(20, weight: .bold))
+                            .font(SweatmatesTypography.headline(22, weight: .bold))
                             .foregroundStyle(SweatmatesColors.textOnCard)
                     )
 
                 if viewModel.cloudKitSyncEngine.partnerSnapshot == nil {
                     ZStack {
-                        Circle().fill(SweatmatesColors.accentFlame).frame(width: 22, height: 22)
+                        Circle().fill(SweatmatesColors.accentFlame).frame(width: 24, height: 24)
                         Image(systemName: "person.badge.plus")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(.white)
                     }
                     .overlay(Circle().stroke(SweatmatesColors.background, lineWidth: 2))
                 }
             }
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(viewModel.pair.currentUser.displayName)
-                    .font(SweatmatesTypography.headline(17, weight: .bold))
+                    .font(SweatmatesTypography.headline(19, weight: .bold))
                     .foregroundStyle(SweatmatesColors.textPrimary)
                 Text(subtitle)
-                    .font(SweatmatesTypography.caption(13))
+                    .font(SweatmatesTypography.caption(14))
                     .foregroundStyle(SweatmatesColors.textSecondary)
             }
 
@@ -118,20 +122,20 @@ struct MenuDrawerView: View {
 
     private func menuRow(icon: String, title: String, badge: String? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(SweatmatesColors.accentFlame)
-                    .frame(width: 24)
+                    .frame(width: 28)
 
                 Text(title)
-                    .font(SweatmatesTypography.body(16, weight: .semibold))
+                    .font(SweatmatesTypography.body(18, weight: .semibold))
                     .foregroundStyle(SweatmatesColors.textPrimary)
 
                 if let badge {
                     Text(badge)
-                        .font(SweatmatesTypography.microLabel(9))
-                        .padding(.horizontal, 7)
+                        .font(SweatmatesTypography.microLabel(10))
+                        .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(Capsule().fill(SweatmatesColors.accentFlame))
                         .foregroundStyle(.white)
@@ -139,8 +143,8 @@ struct MenuDrawerView: View {
 
                 Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 15)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -150,20 +154,24 @@ struct MenuDrawerView: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 ZStack {
-                    Circle().fill(tint.opacity(0.15)).frame(width: 36, height: 36)
-                    Image(systemName: icon).font(.system(size: 15, weight: .bold)).foregroundStyle(tint)
+                    Circle().fill(tint.opacity(0.15)).frame(width: 40, height: 40)
+                    Image(systemName: icon).font(.system(size: 17, weight: .bold)).foregroundStyle(tint)
                 }
                 VStack(alignment: .leading, spacing: 2) {
+                    // textOnCard/textOnCardSecondary, not textPrimary/textSecondary — this
+                    // card's own background (cardSurface) stays light cream in both app
+                    // themes, but textPrimary is adaptive and flips to near-white in dark
+                    // mode, which was rendering as washed-out white-on-cream text.
                     Text(title)
-                        .font(SweatmatesTypography.body(14, weight: .bold))
-                        .foregroundStyle(SweatmatesColors.textPrimary)
+                        .font(SweatmatesTypography.body(15, weight: .bold))
+                        .foregroundStyle(SweatmatesColors.textOnCard)
                     Text(subtitle)
-                        .font(SweatmatesTypography.caption(12))
-                        .foregroundStyle(SweatmatesColors.textSecondary)
+                        .font(SweatmatesTypography.caption(13))
+                        .foregroundStyle(SweatmatesColors.textOnCardSecondary)
                 }
                 Spacer()
             }
-            .padding(12)
+            .padding(14)
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(SweatmatesColors.cardSurface))
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(tint.opacity(0.3), lineWidth: 1.5)

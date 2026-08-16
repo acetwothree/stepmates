@@ -43,7 +43,7 @@ struct PartnerPageView: View {
             VStack(spacing: 4) {
                 Text(viewModel.pair.partner.displayName)
                     .font(SweatmatesTypography.headline(18, weight: .bold))
-                    .foregroundStyle(SweatmatesColors.textPrimary)
+                    .foregroundStyle(SweatmatesColors.textOnCard)
                 Text("Connected")
                     .font(SweatmatesTypography.caption(13, weight: .semibold))
                     .foregroundStyle(SweatmatesColors.accentLimeDeep)

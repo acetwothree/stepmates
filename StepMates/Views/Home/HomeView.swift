@@ -52,10 +52,17 @@ struct HomeView: View {
 
     /// Closes the drawer and opens the requested page on the next runloop tick — doing both
     /// in the same instant makes SwiftUI's dismiss and present animations fight each other.
+    /// The page itself appears instantly rather than sliding up: wrapping the state change in
+    /// a transaction with animations disabled suppresses fullScreenCover's default
+    /// present-from-bottom transition.
     private func openPage(_ present: @escaping () -> Void) {
         viewModel.showMenu = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            present()
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                present()
+            }
         }
     }
 
