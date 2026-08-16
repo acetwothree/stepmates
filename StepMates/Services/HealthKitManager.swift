@@ -273,15 +273,18 @@ final class HealthKitManager {
     /// and always calls the HealthKit completion handler — skipping it repeatedly throttles
     /// future background delivery for this app.
     private func handleObserverUpdate(completionHandler: @escaping HKObserverQueryCompletionHandler) async {
-        // `taskID` is a local var, captured by the expiration closure by reference. By the
-        // time that closure can possibly fire, the assignment below has already completed,
-        // so it always sees the real value — no need to touch `self` or an instance
-        // property from inside it at all.
+        // The expiration closure UIApplication hands us is a plain @Sendable () -> Void,
+        // not MainActor-isolated — but UIApplication.shared itself is. Snapshot `taskID`
+        // into an immutable local before crossing into a Task { @MainActor in }; sending
+        // that plain Sendable value across is fine, only touching `UIApplication.shared`
+        // directly from the non-isolated closure body was ever the problem.
         var taskID: UIBackgroundTaskIdentifier = .invalid
-        taskID = UIApplication.shared.beginBackgroundTask(withName: "StepMates.HealthKitSync") {
-            if taskID != .invalid {
-                UIApplication.shared.endBackgroundTask(taskID)
-                taskID = .invalid
+        taskID = UIApplication.shared.beginBackgroundTask(withName: "StepMatesHealthSync") {
+            let currentID = taskID
+            Task { @MainActor in
+                if currentID != .invalid {
+                    UIApplication.shared.endBackgroundTask(currentID)
+                }
             }
         }
 
