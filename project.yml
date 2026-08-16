@@ -28,6 +28,7 @@ targets:
         UILaunchScreen: {}
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleIconName: AppIcon
     entitlements:
       path: StepMates/Resources/StepMates.entitlements
       properties:

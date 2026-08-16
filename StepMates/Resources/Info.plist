@@ -2,10 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>StepMates reads your daily step count from Health to compare progress with your partner and settle your wagers.</string>
+	<string>StepMates uses your daily step count from Apple Health to passively sync activity with your partner.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>StepMates does not write any data to Health. This permission is requested by the system HealthKit framework but is unused.</string>
+	<string>StepMates logs shared step activity and completed walk streaks to Apple Health.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>processing</string>
