@@ -117,6 +117,23 @@ extension Array where Element == HourlyStepSnapshot {
     }
 }
 
+// MARK: - Empty state
+
+extension StepDay {
+    static func empty(userID: UUID, goal: Int = 10_000) -> StepDay {
+        StepDay(userID: userID, date: .now, stepCount: 0, goal: goal)
+    }
+}
+
+extension DailyStepComparison {
+    /// The real starting comparison before any HealthKit/CloudKit data has arrived.
+    static let empty = DailyStepComparison(
+        date: .now,
+        currentUserDay: .empty(userID: PairedUser.placeholder.id),
+        partnerDay: .empty(userID: PairedUser.notYetConnected.id)
+    )
+}
+
 extension StepDay {
     static let mockCurrentUserToday = StepDay(
         userID: PairedUser.mockMe.id,

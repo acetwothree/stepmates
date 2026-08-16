@@ -91,13 +91,40 @@ final class CloudKitSyncEngine {
             memberRecord[MemberField.todayDistance] = 0.0 as CKRecordValue
             memberRecord[MemberField.lastSyncedAt] = Date.now as CKRecordValue
 
+            // CloudKit data lives in the user's iCloud account, not on-device — a previous
+            // attempt (a prior test run, an app reinstall, a crash mid-flow) can leave a
+            // share already attached to this zone. A zone can only ever have one zone-wide
+            // share, and creating a second one fails, so reuse the existing one instead of
+            // erroring out.
+            if let existingShare = try await fetchExistingZoneShare(zoneID: zoneID) {
+                _ = try await privateDatabase.modifyRecords(saving: [roomRecord, memberRecord], deleting: [], savePolicy: .allKeys)
+
+                self.zoneID = zoneID
+                role = .owner
+                cachedMemberRecord = memberRecord
+                roomSnapshot = RoomSnapshot(record: roomRecord)
+                mySnapshot = MemberSnapshot(record: memberRecord)
+                pairingState = .paired
+                persistPairingState()
+                setupDatabaseSubscriptions()
+
+                return existingShare
+            }
+
             let share = CKShare(recordZoneID: zoneID)
             share[CKShare.SystemFieldKey.title] = "StepMates" as CKRecordValue
             share.publicPermission = .none
 
+            // .allKeys forces an unconditional overwrite instead of the default
+            // .ifServerRecordUnchanged policy, which would reject these saves as conflicts
+            // if stale Room/Member records from an earlier attempt already exist server-side
+            // — freshly-constructed CKRecord objects carry no change tag to satisfy that
+            // check against. We're the zone owner intentionally re-establishing our own
+            // room, so overwriting prior state here is correct.
             let (saveResults, _) = try await privateDatabase.modifyRecords(
                 saving: [roomRecord, memberRecord, share],
-                deleting: []
+                deleting: [],
+                savePolicy: .allKeys
             )
 
             guard case .success(let savedShareRecord) = saveResults[share.recordID],
@@ -119,6 +146,18 @@ final class CloudKitSyncEngine {
             pairingState = .unpaired
             handle(error)
             throw error
+        }
+    }
+
+    /// Zone-wide `CKShare`s are stored at a deterministic record name derived from the zone
+    /// (`CKRecordNameZoneWideShare`), so this is a direct lookup rather than a query.
+    private func fetchExistingZoneShare(zoneID: CKRecordZone.ID) async throws -> CKShare? {
+        let shareID = CKRecord.ID(recordName: CKRecordNameZoneWideShare, zoneID: zoneID)
+        do {
+            let record = try await privateDatabase.record(for: shareID)
+            return record as? CKShare
+        } catch let error as CKError where error.code == .unknownItem {
+            return nil
         }
     }
 

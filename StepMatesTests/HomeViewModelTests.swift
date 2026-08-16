@@ -42,7 +42,22 @@ struct HomeViewModelTests {
         #expect(viewModel.showWeeklyRecap == false)
     }
 
-    @Test func recapAutoPresentsOnSunday() {
+    @Test func recapAutoPresentsOnSundayWhenPartnerIsConnected() {
+        // The gate lives on cloudKitSyncEngine.partnerSnapshot (the real signal that a
+        // partner has synced at least once), not on any field derived from mock/empty pair
+        // state — CloudKitSyncEngine is a singleton, so set and clear it explicitly to
+        // avoid leaking state into other tests.
+        CloudKitSyncEngine.shared.partnerSnapshot = MemberSnapshot(
+            userRecordID: "test-partner",
+            displayName: "Partner",
+            currentSteps: 0,
+            todayDistance: 0,
+            lastSyncedAt: .now,
+            pendingPinkyPromise: nil,
+            lastNudgeTimestamp: nil
+        )
+        defer { CloudKitSyncEngine.shared.partnerSnapshot = nil }
+
         let viewModel = HomeViewModel()
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
@@ -52,10 +67,10 @@ struct HomeViewModelTests {
     }
 
     @Test func recapDoesNotAutoPresentForAFreshPairingEvenOnSunday() {
-        // A pairing whose partner hasn't synced yet (.pending, not .connected) shouldn't
-        // get a "weekly recap" popup for a week that never happened — the exact scenario
+        // No partnerSnapshot at all — the default, unconnected state. Shouldn't get a
+        // "weekly recap" popup for a week that never happened; this is the exact scenario
         // that used to flash the recap modal right after completing onboarding.
-        let viewModel = HomeViewModel(pair: .mockPending)
+        let viewModel = HomeViewModel()
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
         let sunday = calendar.date(from: DateComponents(year: 2026, month: 8, day: 16))!

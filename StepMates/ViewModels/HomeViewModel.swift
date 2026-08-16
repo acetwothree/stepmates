@@ -45,10 +45,10 @@ final class HomeViewModel {
     private var hasOfferedRecapThisSession = false
 
     init(
-        pair: UserPair = .mockConnected,
-        comparison: DailyStepComparison = .mockToday,
-        activeWager: Wager? = .mockVersusSprint,
-        weeklyRecap: WeeklyRecap = .mock,
+        pair: UserPair = .empty,
+        comparison: DailyStepComparison = .empty,
+        activeWager: Wager? = nil,
+        weeklyRecap: WeeklyRecap = .empty,
         healthKitManager: HealthKitManager = .shared,
         cloudKitSyncEngine: CloudKitSyncEngine = .shared
     ) {
@@ -59,7 +59,7 @@ final class HomeViewModel {
         self.healthKitManager = healthKitManager
         self.cloudKitSyncEngine = cloudKitSyncEngine
 
-        // Apply whatever onboarding collected (name, daily step goal) over the mock
+        // Apply whatever onboarding collected (name, daily step goal) over the empty
         // defaults, so answering those questions during onboarding actually shows up.
         if let profile = OnboardingProfileStore.load() {
             if !profile.firstName.isEmpty {
@@ -266,12 +266,15 @@ final class HomeViewModel {
     }
 
     /// Surfaces the weekly recap automatically on Sundays, once per session — but only once
-    /// the pairing is actually established (partner has synced at least once). Without that
-    /// gate, a user who just paired for the first time on a Sunday would get a "weekly
-    /// recap" popup for a week that never happened.
+    /// the pairing is actually established (partner has synced at least once). Gates
+    /// directly on cloudKitSyncEngine.partnerSnapshot rather than pair.connectionStatus:
+    /// the latter defaults to UserPair.empty's .pending, true, but a *skipped* or
+    /// failed pairing attempt could otherwise leave stale/mock-derived state that
+    /// satisfies a looser check. partnerSnapshot is nil until the partner has genuinely
+    /// synced at least once, which is the real precondition for a recap to mean anything.
     func presentRecapIfNeeded(calendar: Calendar = .current, now: Date = .now) {
         guard !hasOfferedRecapThisSession else { return }
-        guard pair.connectionStatus == .connected else { return }
+        guard cloudKitSyncEngine.partnerSnapshot != nil else { return }
         hasOfferedRecapThisSession = true
         if calendar.component(.weekday, from: now) == 1 {
             showWeeklyRecap = true

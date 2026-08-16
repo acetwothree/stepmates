@@ -95,6 +95,30 @@ struct UserPair: Identifiable, Codable, Sendable {
     var syncStaleness: TimeInterval { Date.now.timeIntervalSince(lastSyncedAt) }
 }
 
+// MARK: - Empty state (real default, before any live data arrives)
+
+extension PairedUser {
+    /// The current user before onboarding's collected name/goal (or any HealthKit data)
+    /// has been applied. Never shown as-is in practice — HomeViewModel overrides this from
+    /// OnboardingProfileStore immediately on init.
+    static let placeholder = PairedUser(displayName: "You", avatarSystemName: "person.circle.fill")
+
+    /// Stands in for the partner slot until someone actually joins the room.
+    static let notYetConnected = PairedUser(displayName: "Your Partner", avatarSystemName: "person.crop.circle.dashed")
+}
+
+extension UserPair {
+    /// The real starting state for a fresh HomeViewModel: no room, no partner, nothing
+    /// borrowed from mock data. CloudKit/HealthKit sync fills this in as real data arrives.
+    static let empty = UserPair(
+        roomID: "",
+        currentUser: .placeholder,
+        partner: .notYetConnected,
+        sharedStreak: 0,
+        connectionStatus: .pending
+    )
+}
+
 // MARK: - Mock Data
 
 extension PairedUser {

@@ -66,6 +66,13 @@ struct WeeklyRecap: Identifiable, Codable, Sendable {
     var combinedDistanceMiles: Double { Double(combinedSteps) / 2_000 }
 }
 
+// MARK: - Empty state
+
+extension WeeklyRecap {
+    /// No data yet — a fresh pairing with no recorded week behind it.
+    static let empty = WeeklyRecap(currentUserWins: 0, partnerWins: 0, currentUserTotalSteps: 0, partnerTotalSteps: 0)
+}
+
 // MARK: - Mock Data
 
 extension WeeklyRecap {

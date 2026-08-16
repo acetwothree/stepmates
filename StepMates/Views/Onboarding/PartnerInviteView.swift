@@ -144,7 +144,7 @@ struct PartnerInviteView: View {
                     try? await cloudKitSyncEngine.updateActiveWager(wager)
                 }
             } catch {
-                errorMessage = "Couldn't create your room. Check your connection and try again."
+                errorMessage = "Couldn't create your room: \(error.localizedDescription)"
             }
             isCreatingRoom = false
         }
