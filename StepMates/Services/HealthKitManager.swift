@@ -270,12 +270,13 @@ final class HealthKitManager {
     private func handleObserverUpdate(completionHandler: @escaping HKObserverQueryCompletionHandler) async {
         // The expiration handler isn't MainActor-isolated — it's a plain escaping closure
         // handed to UIKit, not a Task, so it doesn't inherit this method's actor context.
-        // Hop explicitly before touching `backgroundTaskID` or `UIApplication.shared`.
+        // Resolve `self` once here and let the Task capture that single strong reference
+        // directly; re-declaring [weak self] a second time on the nested Task is what
+        // trips Swift 6's region-based "task or actor isolated value cannot be sent" check.
         let taskID = UIApplication.shared.beginBackgroundTask(withName: "StepMates.HealthKitSync") { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self, self.backgroundTaskID != .invalid else { return }
-                UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
-                self.backgroundTaskID = .invalid
+            guard let self else { return }
+            Task { @MainActor in
+                self.endBackgroundTaskIfNeeded()
             }
         }
         backgroundTaskID = taskID
@@ -287,6 +288,14 @@ final class HealthKitManager {
             UIApplication.shared.endBackgroundTask(taskID)
             backgroundTaskID = .invalid
         }
+    }
+
+    /// Ends the currently tracked background task, if any. Pulled out so the expiration
+    /// handler's Task body has nothing to do but call one MainActor-isolated method.
+    private func endBackgroundTaskIfNeeded() {
+        guard backgroundTaskID != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTaskID)
+        backgroundTaskID = .invalid
     }
 
     private func enableBackgroundDeliveryIfNeeded() {
