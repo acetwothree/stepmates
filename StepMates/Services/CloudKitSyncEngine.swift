@@ -16,12 +16,12 @@ enum CloudKitSyncError: Error, Sendable, LocalizedError {
     /// be completed" boilerplate Swift synthesizes for a plain enum case gives no way to tell
     /// "the share result was missing from the response" from "it wasn't a CKShare" from any
     /// other failure mode — all three used to collapse into the same undiagnosable message.
-    case shareSaveFailed(reason: String)
+    case roomSetupFailed(reason: String)
     case notPaired
 
     var errorDescription: String? {
         switch self {
-        case .shareSaveFailed(let reason): return "Couldn't finish creating the share (\(reason))."
+        case .roomSetupFailed(let reason): return "Couldn't finish setting up your room (\(reason))."
         case .notPaired: return "Not paired yet."
         }
     }
@@ -153,7 +153,7 @@ final class CloudKitSyncEngine {
             )
 
             // Surface the *real* per-record failure reason rather than the opaque
-            // .shareSaveFailed fallback — modifyRecords can fail an individual item (e.g. the
+            // .roomSetupFailed fallback — modifyRecords can fail an individual item (e.g. the
             // record type genuinely doesn't exist in this CloudKit environment yet) without
             // throwing at the batch level, and swallowing that into a generic error made this
             // undiagnosable from the field.
@@ -164,17 +164,17 @@ final class CloudKitSyncEngine {
             }
             // Distinguish "missing from the response" from "present but not a success" from
             // "success but somehow not a CKShare" — three genuinely different failure modes
-            // that a single generic .shareSaveFailed case couldn't tell apart from the field.
+            // that a single generic error case couldn't tell apart from the field.
             guard let shareResult = saveResults[share.recordID] else {
-                throw CloudKitSyncError.shareSaveFailed(
+                throw CloudKitSyncError.roomSetupFailed(
                     reason: "share result missing from server response (\(saveResults.count) of 3 records returned)"
                 )
             }
             guard case .success(let savedShareRecord) = shareResult else {
-                throw CloudKitSyncError.shareSaveFailed(reason: "share record was present but not marked successful")
+                throw CloudKitSyncError.roomSetupFailed(reason: "share record was present but not marked successful")
             }
             guard let savedShare = savedShareRecord as? CKShare else {
-                throw CloudKitSyncError.shareSaveFailed(reason: "saved record was a \(type(of: savedShareRecord)), not a CKShare")
+                throw CloudKitSyncError.roomSetupFailed(reason: "saved record was a \(type(of: savedShareRecord)), not a CKShare")
             }
 
             self.zoneID = zoneID
@@ -190,7 +190,11 @@ final class CloudKitSyncEngine {
         } catch {
             pairingState = .unpaired
             handle(error)
-            throw error
+            // modifyRecords under .allKeys can fail *atomically* — the top-level error is a
+            // content-free "atomic failure" wrapper, with the real per-record reason buried in
+            // CKError.partialErrorsByItemID. Unwrap that so the actual cause is what surfaces
+            // in the UI instead of a dead end.
+            throw Self.unwrapAtomicFailure(error)
         }
     }
 
@@ -653,6 +657,23 @@ final class CloudKitSyncEngine {
         default:
             break
         }
+    }
+
+    /// A batch save under `.allKeys` can be rejected atomically — CloudKit's top-level error
+    /// is a content-free "atomic failure," while the actual per-record reason (a permission
+    /// issue, a field that doesn't exist in this environment, a type mismatch, etc.) sits in
+    /// `CKError.partialErrorsByItemID`. Unwrapping it is the difference between an error
+    /// message someone can act on and one that just says "something failed."
+    private static func unwrapAtomicFailure(_ error: Error) -> Error {
+        guard let ckError = error as? CKError,
+              let partialErrors = ckError.partialErrorsByItemID,
+              !partialErrors.isEmpty else {
+            return error
+        }
+        let reasons = partialErrors.map { key, underlying in
+            "\(key): \(underlying.localizedDescription)"
+        }.joined(separator: "; ")
+        return CloudKitSyncError.roomSetupFailed(reason: reasons)
     }
 
     // MARK: Local persistence

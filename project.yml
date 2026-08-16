@@ -31,6 +31,11 @@ targets:
         CFBundleIconName: AppIcon
         NSHealthShareUsageDescription: "StepMates uses your step count to track daily progress and display shared stats with your partner."
         NSHealthUpdateUsageDescription: "StepMates syncs step goals and active walk streaks to Apple Health."
+        # StepMates only uses standard OS-provided HTTPS/TLS (via CloudKit, URLSession, etc.)
+        # — no custom or non-exempt encryption — so this is a truthful "no" that makes every
+        # future TestFlight build skip App Store Connect's manual export-compliance gate
+        # ("Missing Compliance") instead of sitting unusable until someone clicks through it.
+        ITSAppUsesNonExemptEncryption: false
     entitlements:
       path: StepMates/Resources/StepMates.entitlements
       properties:
