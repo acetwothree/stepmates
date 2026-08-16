@@ -2,8 +2,10 @@
 //  TodaysWagerCard.swift
 //  StepMates
 //
-//  A single-line "what's on the line today" card — simplified from the old multi-mode
-//  Active Stake box down to one plain-English stakes line, e.g. "Stakes: Loser buys coffee ☕️".
+//  A single-line "what's on the line" card — simplified from the old multi-mode Active Stake
+//  box down to one plain-English stakes line, e.g. "Stakes: Loser buys coffee ☕️". Despite the
+//  name (kept from when every wager was daily), it now covers whatever duration is active and
+//  reflects the real countdown to `wager.endDate` instead of always-today.
 //
 
 import SwiftUI
@@ -15,14 +17,22 @@ struct TodaysWagerCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Today's Wager").microLabel()
+                Text("Wager · \(wager.duration.displayName)").microLabel()
                 Spacer()
-                CountdownBadge(deadline: .todaySettlement)
+                if wager.isFullyAgreed {
+                    CountdownBadge(deadline: wager.endDate)
+                }
             }
 
             Text(stakesLine)
                 .font(SweatmatesTypography.headline(18, weight: .semibold))
                 .foregroundStyle(SweatmatesColors.textOnCard)
+
+            if !wager.isFullyAgreed {
+                Label("Waiting for \(pair.partner.displayName) to agree", systemImage: "hourglass")
+                    .font(SweatmatesTypography.caption(12, weight: .semibold))
+                    .foregroundStyle(SweatmatesColors.pending)
+            }
         }
         .padding(20)
         .background(RoundedRectangle(cornerRadius: 26, style: .continuous).fill(SweatmatesColors.cardSurface))

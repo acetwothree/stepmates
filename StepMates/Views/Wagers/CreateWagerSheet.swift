@@ -2,9 +2,11 @@
 //  CreateWagerSheet.swift
 //  StepMates
 //
-//  Sweatmates-style wager creation: penalty stake or joint reward, playful presets,
-//  daily step target. Symmetric "loser pays" stakes by design — asymmetric per-partner
-//  stakes remain supported by the Wager model for wagers created elsewhere.
+//  Sweatmates-style wager creation: penalty stake or joint reward, playful presets, a
+//  duration (1 day/week/month), and a target that's always auto-calculated from each
+//  person's own daily goal — never hand-picked, so the wager can't be quietly stacked in
+//  one side's favor. Proposing locks nothing in by itself: the other partner has to agree
+//  (see PendingWagerBanner) before status moves from .proposed to .active.
 //
 
 import SwiftUI
@@ -16,14 +18,15 @@ struct CreateWagerSheet: View {
     }
 
     var pair: UserPair
+    var myRole: PairingRole
     var onCreate: (Wager) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
     @State private var kind: Kind = .penalty
+    @State private var duration: WagerDuration = .week
     @State private var selectedPenaltyChip: String = Self.penaltyPresets[0]
     @State private var customPenaltyText = ""
-    @State private var selectedTargetSteps = 10_000
     @State private var selectedRewardChip: String = Self.rewardPresets[0]
     @State private var customRewardText = ""
     @State private var streakRequirement = 7
@@ -36,7 +39,6 @@ struct CreateWagerSheet: View {
         "Plan Date Night": "Loser plans date night",
     ]
     private static let rewardPresets = ["Dinner Out", "Movie Night", "Spa Day", "Custom"]
-    private static let stepTargets = [8_000, 10_000, 12_000]
     private static let streakOptions = [3, 5, 7, 14]
 
     var body: some View {
@@ -44,6 +46,7 @@ struct CreateWagerSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     kindToggle
+                    durationSection
 
                     if kind == .penalty {
                         penaltySection
@@ -95,6 +98,50 @@ struct CreateWagerSheet: View {
         }
     }
 
+    private var durationSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            sectionLabel("How long")
+            HStack(spacing: 8) {
+                ForEach(WagerDuration.allCases) { option in
+                    SelectableChip(title: option.displayName, isSelected: duration == option) {
+                        HapticService.shared.lightTap()
+                        duration = option
+                    }
+                }
+            }
+
+            if kind == .penalty {
+                targetSummary
+            }
+        }
+    }
+
+    /// Always derived, never hand-picked: each side's target is their own daily goal scaled
+    /// by the chosen duration, so switching duration recalculates this live.
+    private var targetSummary: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Target (auto-calculated)")
+            HStack(spacing: 16) {
+                targetColumn(label: "You", steps: duration.periodTarget(dailyGoal: pair.currentUser.dailyStepGoal))
+                targetColumn(label: pair.partner.displayName, steps: duration.periodTarget(dailyGoal: pair.partner.dailyStepGoal))
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(SweatmatesColors.cardSurfaceElevated))
+    }
+
+    private func targetColumn(label: String, steps: Int) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .font(SweatmatesTypography.microLabel(10))
+                .foregroundStyle(SweatmatesColors.textOnCardSecondary)
+            Text("\(steps.formatted()) steps")
+                .font(SweatmatesTypography.body(15, weight: .bold))
+                .foregroundStyle(SweatmatesColors.textOnCard)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var penaltySection: some View {
         VStack(alignment: .leading, spacing: 16) {
             sectionLabel("If you lose…")
@@ -112,16 +159,6 @@ struct CreateWagerSheet: View {
             if selectedPenaltyChip == "Custom" {
                 TextField("Describe the forfeit", text: $customPenaltyText)
                     .stepMatesFieldStyle()
-            }
-
-            sectionLabel("Daily step target")
-            HStack(spacing: 8) {
-                ForEach(Self.stepTargets, id: \.self) { target in
-                    SelectableChip(title: "\(target.formatted())", isSelected: selectedTargetSteps == target) {
-                        HapticService.shared.lightTap()
-                        selectedTargetSteps = target
-                    }
-                }
             }
         }
     }
@@ -165,7 +202,7 @@ struct CreateWagerSheet: View {
         Button {
             createWager()
         } label: {
-            Text("Lock It In")
+            Text("Propose Wager")
                 .font(SweatmatesTypography.headline(17, weight: .bold))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -181,7 +218,8 @@ struct CreateWagerSheet: View {
     // MARK: Actions
 
     private func createWager() {
-        let endDate = Date.todaySettlement
+        let start = Date.now
+        let end = duration.endDate(from: start)
         let newWager: Wager
 
         switch kind {
@@ -192,24 +230,41 @@ struct CreateWagerSheet: View {
             let resolvedDescription = description.isEmpty ? "Loser picks the forfeit" : description
             let mine = PenaltyStake(owner: pair.currentUser.displayName, stakeDescription: resolvedDescription)
             let theirs = PenaltyStake(owner: pair.partner.displayName, stakeDescription: resolvedDescription)
+
+            let myTarget = duration.periodTarget(dailyGoal: pair.currentUser.dailyStepGoal, from: start)
+            let partnerTarget = duration.periodTarget(dailyGoal: pair.partner.dailyStepGoal, from: start)
+            let ownerTarget = myRole == .owner ? myTarget : partnerTarget
+            let partnerRoleTarget = myRole == .owner ? partnerTarget : myTarget
+
             newWager = Wager(
                 pairID: pair.id,
                 mode: .versusSprint,
-                status: .active,
+                duration: duration,
+                status: .proposed,
                 stakeForCurrentUser: mine,
                 stakeForPartner: theirs,
-                targetSteps: selectedTargetSteps,
-                endDate: endDate
+                targetStepsForOwner: ownerTarget,
+                targetStepsForPartner: partnerRoleTarget,
+                startDate: start,
+                endDate: end,
+                proposedByRole: myRole,
+                agreedByOwner: myRole == .owner,
+                agreedByPartner: myRole == .partner
             )
         case .treatYourself:
             let reward = selectedRewardChip == "Custom" ? customRewardText : selectedRewardChip
             newWager = Wager(
                 pairID: pair.id,
                 mode: .treatYourself,
-                status: .active,
+                duration: duration,
+                status: .proposed,
                 streakRequirement: streakRequirement,
                 rewardDescription: reward.isEmpty ? "A treat, TBD" : reward,
-                endDate: endDate
+                startDate: start,
+                endDate: end,
+                proposedByRole: myRole,
+                agreedByOwner: myRole == .owner,
+                agreedByPartner: myRole == .partner
             )
         }
 
@@ -227,5 +282,5 @@ private extension View {
 }
 
 #Preview("Create Wager Sheet") {
-    CreateWagerSheet(pair: .mockConnected) { _ in }
+    CreateWagerSheet(pair: .mockConnected, myRole: .owner) { _ in }
 }

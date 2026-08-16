@@ -31,7 +31,11 @@ struct HomeView: View {
                     .padding(20)
                     .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(SweatmatesColors.cardSurface))
 
-                if let wager = viewModel.activeWager {
+                if let awaiting = viewModel.wagerAwaitingMyAgreement {
+                    PendingWagerBanner(wager: awaiting, pair: viewModel.pair) { accepted in
+                        viewModel.respondToWagerProposal(accept: accepted)
+                    }
+                } else if let wager = viewModel.activeWager {
                     TodaysWagerCard(wager: wager, pair: viewModel.pair)
                 } else {
                     startWagerPrompt
@@ -45,9 +49,14 @@ struct HomeView: View {
         }
         .background(SweatmatesColors.background.ignoresSafeArea())
         .sheet(isPresented: $viewModel.showCreateWagerSheet) {
-            CreateWagerSheet(pair: viewModel.pair) { wager in
+            CreateWagerSheet(pair: viewModel.pair, myRole: viewModel.cloudKitSyncEngine.role ?? .owner) { wager in
                 viewModel.addWager(wager)
             }
+        }
+        .alert("Wager Locked In", isPresented: $viewModel.showWagerLockedAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("You and \(viewModel.pair.partner.displayName) both agreed to this wager — it can't be changed until it resolves.")
         }
         .sheet(isPresented: $viewModel.showWeeklyRecap) {
             WeeklyRecapModal(pair: viewModel.pair, recap: viewModel.weeklyRecap)

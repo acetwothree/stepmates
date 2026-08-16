@@ -132,14 +132,23 @@ struct PartnerInviteView: View {
 
                 if let stakeDescription = state.resolvedWagerStakeDescription {
                     let stake = PenaltyStake(owner: "shared", stakeDescription: stakeDescription)
+                    // Proposed, not active: the partner hasn't joined yet, so there's no one
+                    // to agree to it. It shows up as a pending proposal for them to accept
+                    // once they do — same as any other wager, per the "both parties have to
+                    // agree" rule.
                     let wager = Wager(
                         pairID: UUID(),
                         mode: .versusSprint,
-                        status: .active,
+                        duration: .day,
+                        status: .proposed,
                         stakeForCurrentUser: stake,
                         stakeForPartner: stake,
-                        targetSteps: goal,
-                        endDate: Date.todaySettlement
+                        targetStepsForOwner: goal,
+                        targetStepsForPartner: goal,
+                        endDate: Date.todaySettlement,
+                        proposedByRole: .owner,
+                        agreedByOwner: true,
+                        agreedByPartner: false
                     )
                     try? await cloudKitSyncEngine.updateActiveWager(wager)
                 }

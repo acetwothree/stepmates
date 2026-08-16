@@ -449,6 +449,22 @@ final class CloudKitSyncEngine {
         }
     }
 
+    /// Removes the active wager outright — used when a proposed wager is declined.
+    func clearActiveWager() async throws {
+        guard let zoneID else { return }
+        do {
+            let roomID = CKRecord.ID(recordName: "Room", zoneID: zoneID)
+            let record = try await activeDatabase.record(for: roomID)
+            record[RoomField.activeWagerData] = nil
+            record[RoomField.updatedAt] = Date.now as CKRecordValue
+            let saved = try await activeDatabase.save(record)
+            roomSnapshot = RoomSnapshot(record: saved)
+        } catch {
+            handle(error)
+            throw error
+        }
+    }
+
     /// Re-fetches the room and both member records. Missing records (e.g. the partner
     /// hasn't joined yet) are simply left as `nil` rather than failing the whole refresh.
     func refreshFromCloud() async {

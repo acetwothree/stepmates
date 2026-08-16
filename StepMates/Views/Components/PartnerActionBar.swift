@@ -34,7 +34,7 @@ struct PartnerActionBar: View {
                     emoji: "⚡️",
                     gradient: SweatmatesColors.limeGradient
                 ) {
-                    viewModel.showCreateWagerSheet = true
+                    viewModel.editWagersTapped()
                 }
             }
         }

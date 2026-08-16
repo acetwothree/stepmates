@@ -26,6 +26,7 @@ final class HomeViewModel {
     var showWeeklyRecap = false
     var showStats = false
     var showSettings = false
+    var showWagerLockedAlert = false
 
     private var nudgeClearTask: Task<Void, Never>?
     private var hasOfferedRecapThisSession = false
@@ -217,6 +218,59 @@ final class HomeViewModel {
     func refreshAll() async {
         await healthKitManager.refreshTodayStats()
         await cloudKitSyncEngine.refreshFromCloud()
+    }
+
+    /// The current wager, but only when it's a proposal genuinely waiting on *this* device to
+    /// respond — nil once both sides have agreed, and nil for the proposer's own device (they
+    /// already auto-agreed by proposing, so they see the "waiting on partner" state on the
+    /// wager card instead of a banner asking them to respond to themselves).
+    var wagerAwaitingMyAgreement: Wager? {
+        guard let wager = activeWager, !wager.isFullyAgreed, let myRole = cloudKitSyncEngine.role else { return nil }
+        let haveIAgreed = myRole == .owner ? wager.agreedByOwner : wager.agreedByPartner
+        return haveIAgreed ? nil : wager
+    }
+
+    /// Answers a wager the partner proposed. Accepting marks this device's role as agreed and,
+    /// once both sides have agreed, flips status to `.active` — locked in until it resolves.
+    /// Declining clears the proposal outright rather than leaving a rejected wager lingering.
+    func respondToWagerProposal(accept: Bool) {
+        guard var wager = activeWager, let myRole = cloudKitSyncEngine.role else { return }
+        HapticService.shared.wagerLock()
+
+        guard accept else {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                activeWager = nil
+            }
+            Task { try? await cloudKitSyncEngine.clearActiveWager() }
+            return
+        }
+
+        switch myRole {
+        case .owner: wager.agreedByOwner = true
+        case .partner: wager.agreedByPartner = true
+        }
+        if wager.isFullyAgreed {
+            wager.status = .active
+        }
+
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            activeWager = wager
+        }
+        Task {
+            try? await cloudKitSyncEngine.updateActiveWager(wager)
+        }
+    }
+
+    /// The "Edit Wagers" entry point: opens the proposal sheet, unless a wager is already
+    /// locked in (both sides agreed) — that can't be edited until it resolves, so this just
+    /// explains why instead of letting the sheet quietly overwrite a wager the partner already
+    /// committed to.
+    func editWagersTapped() {
+        if let wager = activeWager, wager.isFullyAgreed {
+            showWagerLockedAlert = true
+        } else {
+            showCreateWagerSheet = true
+        }
     }
 
     func addWager(_ wager: Wager) {

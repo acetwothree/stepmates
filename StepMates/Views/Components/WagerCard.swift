@@ -12,7 +12,7 @@ struct WagerCard: View {
 
     private var statusColor: Color {
         switch wager.status {
-        case .pending: return SweatmatesColors.pending
+        case .proposed: return SweatmatesColors.pending
         case .active: return SweatmatesColors.accentLime
         case .resolved: return SweatmatesColors.textTertiary
         case .disputed: return SweatmatesColors.accentFlame
@@ -22,7 +22,7 @@ struct WagerCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(wager.mode.displayName).microLabel(color: SweatmatesColors.textOnCardSecondary)
+                Text("\(wager.mode.displayName) · \(wager.duration.displayName)").microLabel(color: SweatmatesColors.textOnCardSecondary)
                 Spacer()
                 statusPill
             }
@@ -33,13 +33,21 @@ struct WagerCard: View {
 
             stakesView
 
-            HStack {
-                Image(systemName: "clock.fill")
-                    .font(.system(size: 11))
-                Text(wager.daysRemaining == 0 ? "Ends today" : "\(wager.daysRemaining)d left")
-                    .font(SweatmatesTypography.caption(12))
+            if wager.isFullyAgreed {
+                HStack {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 10))
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 11))
+                    Text(wager.daysRemaining == 0 ? "Ends today" : "\(wager.daysRemaining)d left")
+                        .font(SweatmatesTypography.caption(12))
+                }
+                .foregroundStyle(SweatmatesColors.textOnCardSecondary)
+            } else {
+                Text("Locks in once both of you agree")
+                    .font(SweatmatesTypography.caption(12, weight: .semibold))
+                    .foregroundStyle(SweatmatesColors.pending)
             }
-            .foregroundStyle(SweatmatesColors.textOnCardSecondary)
         }
         .padding(20)
         .background(RoundedRectangle(cornerRadius: 26, style: .continuous).fill(SweatmatesColors.cardSurface))
@@ -67,6 +75,9 @@ struct WagerCard: View {
                 }
                 if let theirs = wager.stakeForPartner {
                     stakeRow(icon: "person.fill.badge.plus", text: "If they lose: \(theirs.stakeDescription)")
+                }
+                if let target = wager.targetStepsForOwner ?? wager.targetStepsForPartner {
+                    stakeRow(icon: "target", text: "Target: \(target.formatted()) steps over \(wager.duration.displayName.lowercased())")
                 }
             }
         case .coOpSharedTarget:
