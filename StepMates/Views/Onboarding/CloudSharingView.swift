@@ -30,6 +30,7 @@ struct CloudSharingView: UIViewControllerRepresentable {
         return coordinator
     }
 
+    @MainActor
     final class Coordinator: NSObject, UICloudSharingControllerDelegate {
         var onDismiss: () -> Void = {}
 

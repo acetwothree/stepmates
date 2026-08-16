@@ -6,7 +6,13 @@
 //  is read-only: StepMates never writes to Health, it only listens.
 //
 
-import HealthKit
+// HealthKit's callback types (HKObserverQueryCompletionHandler, HKStatisticsCollectionQuery's
+// initialResultsHandler, etc.) predate Swift concurrency and aren't marked @Sendable, even
+// though we only ever hand them Sendable-safe captures. @preconcurrency is Apple's own
+// documented mechanism for this exact situation — a not-fully-audited framework whose values
+// need to cross into async/Task contexts — and downgrades those specific mismatches instead
+// of hard-erroring under complete strict concurrency.
+@preconcurrency import HealthKit
 import Observation
 import UIKit
 
