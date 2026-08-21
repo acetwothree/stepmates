@@ -36,6 +36,12 @@ targets:
         # future TestFlight build skip App Store Connect's manual export-compliance gate
         # ("Missing Compliance") instead of sitting unusable until someone clicks through it.
         ITSAppUsesNonExemptEncryption: false
+        # Without this, the system tries to resolve a tapped CKShare link via an App Store
+        # lookup for the app before handing off to it — which fails outright for a
+        # TestFlight-only app with no App Store listing, even when the app is already
+        # installed on the recipient's device ("You need a newer version... couldn't be
+        # found in the App Store").
+        CKSharingSupported: true
     entitlements:
       path: StepMates/Resources/StepMates.entitlements
       properties:
