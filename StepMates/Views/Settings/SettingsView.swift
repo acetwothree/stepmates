@@ -252,6 +252,16 @@ struct SettingsView: View {
             } message: {
                 Text("This deletes the shared CloudKit room for both you and your partner. This can't be undone.")
             }
+            if let lastError = viewModel.cloudKitSyncEngine.lastError {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Last CloudKit Error")
+                        .font(SweatmatesTypography.caption(12, weight: .semibold))
+                        .foregroundStyle(SweatmatesColors.textSecondary)
+                    Text(lastError.localizedDescription)
+                        .font(SweatmatesTypography.caption(12))
+                        .foregroundStyle(SweatmatesColors.danger)
+                }
+            }
         } header: {
             Text("Developer / Admin")
         } footer: {
