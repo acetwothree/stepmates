@@ -50,6 +50,7 @@ struct PendingWagerBanner: View {
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(SweatmatesColors.cardSurface))
+        .shadow(color: .black.opacity(0.18), radius: 14, x: 0, y: 5)
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(SweatmatesColors.accentFlame.opacity(0.35), lineWidth: 1.5)

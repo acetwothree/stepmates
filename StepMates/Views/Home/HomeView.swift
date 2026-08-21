@@ -69,8 +69,10 @@ struct HomeView: View {
     private var mainContent: some View {
         ScrollView {
             VStack(spacing: 20) {
-                hamburgerRow
-                header
+                VStack(spacing: 12) {
+                    hamburgerRow
+                    header
+                }
 
                 HealthKitStatusBanner(status: viewModel.healthKitManager.authorizationStatus)
 
@@ -99,6 +101,7 @@ struct HomeView: View {
                 StepArenaView(pair: viewModel.pair, comparison: viewModel.comparison)
                     .padding(20)
                     .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(SweatmatesColors.cardSurface))
+                    .shadow(color: .black.opacity(0.18), radius: 16, x: 0, y: 6)
 
                 detailedStatsLink
             }
@@ -141,6 +144,9 @@ struct HomeView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 8) {
+                Text(greeting)
+                    .font(SweatmatesTypography.headline(22, weight: .bold))
+                    .foregroundStyle(SweatmatesColors.textPrimary)
                 StreakBadge(
                     streakCount: viewModel.pair.sharedStreak,
                     isAtRisk: viewModel.pair.connectionStatus == .needsRepair
@@ -149,6 +155,17 @@ struct HomeView: View {
             }
             Spacer()
         }
+    }
+
+    private var greeting: String {
+        let timeOfDay: String
+        switch Calendar.current.component(.hour, from: .now) {
+        case 5..<12: timeOfDay = "Morning"
+        case 12..<17: timeOfDay = "Afternoon"
+        default: timeOfDay = "Evening"
+        }
+        let name = viewModel.pair.currentUser.displayName
+        return name.isEmpty ? timeOfDay : "\(timeOfDay), \(name)"
     }
 
     private var connectionStatusLabel: some View {
@@ -198,6 +215,7 @@ struct HomeView: View {
             }
             .padding(16)
             .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(SweatmatesColors.cardSurface))
+            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 4)
         }
         .buttonStyle(.plain)
     }

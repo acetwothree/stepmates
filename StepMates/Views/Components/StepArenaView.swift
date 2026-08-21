@@ -18,11 +18,13 @@ struct StepArenaView: View {
             HStack(alignment: .top, spacing: 24) {
                 ringColumn(
                     name: "You",
+                    initialsSource: pair.currentUser.displayName,
                     day: comparison.currentUserDay,
                     gradient: SweatmatesColors.flameGradient
                 )
                 ringColumn(
                     name: pair.partner.displayName,
+                    initialsSource: pair.partner.displayName,
                     day: comparison.partnerDay,
                     gradient: SweatmatesColors.limeGradient
                 )
@@ -32,8 +34,10 @@ struct StepArenaView: View {
     }
 
     @ViewBuilder
-    private func ringColumn(name: String, day: StepDay, gradient: LinearGradient) -> some View {
+    private func ringColumn(name: String, initialsSource: String, day: StepDay, gradient: LinearGradient) -> some View {
         VStack(spacing: 8) {
+            avatarBubble(initialsSource: initialsSource, gradient: gradient)
+
             Text(name.uppercased()).microLabel()
 
             ZStack {
@@ -61,6 +65,18 @@ struct StepArenaView: View {
                 .foregroundStyle(SweatmatesColors.textOnCardSecondary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// A small initial-bubble avatar in the same gradient as that person's ring — gives each
+    /// side of the head-to-head an actual face instead of just a text label, and ties the
+    /// avatar visually to "their" color the same way the ring and delta pill already do.
+    private func avatarBubble(initialsSource: String, gradient: LinearGradient) -> some View {
+        ZStack {
+            Circle().fill(gradient).frame(width: 32, height: 32)
+            Text(String(initialsSource.prefix(1)).uppercased())
+                .font(SweatmatesTypography.caption(13, weight: .bold))
+                .foregroundStyle(.white)
+        }
     }
 
     private var deltaPill: some View {

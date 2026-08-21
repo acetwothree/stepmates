@@ -51,6 +51,7 @@ struct WagerCard: View {
         }
         .padding(20)
         .background(RoundedRectangle(cornerRadius: 26, style: .continuous).fill(SweatmatesColors.cardSurface))
+        .shadow(color: .black.opacity(0.18), radius: 16, x: 0, y: 6)
     }
 
     @ViewBuilder
@@ -71,10 +72,10 @@ struct WagerCard: View {
         case .versusSprint:
             VStack(alignment: .leading, spacing: 6) {
                 if let mine = wager.stakeForCurrentUser {
-                    stakeRow(icon: "person.fill", text: "If I lose: \(mine.stakeDescription)")
+                    stakeRow(icon: "person.fill", text: "If I lose: \(mine.stakeDescription)", iconTint: SweatmatesColors.accentFlame)
                 }
                 if let theirs = wager.stakeForPartner {
-                    stakeRow(icon: "person.fill.badge.plus", text: "If they lose: \(theirs.stakeDescription)")
+                    stakeRow(icon: "person.fill.badge.plus", text: "If they lose: \(theirs.stakeDescription)", iconTint: SweatmatesColors.accentLimeDeep)
                 }
                 if let target = wager.targetStepsForOwner ?? wager.targetStepsForPartner {
                     stakeRow(icon: "target", text: "Target: \(target.formatted()) steps over \(wager.duration.displayName.lowercased())")
@@ -96,10 +97,20 @@ struct WagerCard: View {
         }
     }
 
-    private func stakeRow(icon: String, text: String) -> some View {
-        Label(text, systemImage: icon)
-            .font(SweatmatesTypography.body(14))
-            .foregroundStyle(SweatmatesColors.textOnCard.opacity(0.85))
+    /// Icon and text are colored independently (not a single-tint Label) so a stake's icon can
+    /// carry the flame/lime "whose side" color the rest of the app already uses (see the ring
+    /// avatars in StepArenaView) without recoloring the stake description text itself — lime is
+    /// too light against the cream card to stay readable as body text.
+    private func stakeRow(icon: String, text: String, iconTint: Color = SweatmatesColors.textOnCard.opacity(0.7)) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(iconTint)
+                .frame(width: 18)
+            Text(text)
+                .font(SweatmatesTypography.body(14))
+                .foregroundStyle(SweatmatesColors.textOnCard.opacity(0.85))
+        }
     }
 }
 
