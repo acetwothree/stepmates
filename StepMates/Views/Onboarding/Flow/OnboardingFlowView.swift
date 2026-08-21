@@ -44,7 +44,15 @@ struct OnboardingFlowView: View {
             case .healthKitPermission:
                 HealthKitPermissionView(healthKitManager: healthKitManager, onFinished: advance, onBack: goBack)
             case .partnerInvite:
-                PartnerInviteView(cloudKitSyncEngine: cloudKitSyncEngine, state: onboardingState, onFinished: advance, onBack: goBack)
+                // A partner who joined via an already-accepted CKShare has nothing to invite
+                // — the system-level accept sheet (shown before this app UI ever appeared)
+                // already paired them. Without this check every partner would land on the
+                // owner-facing "Invite Your Partner" screen regardless of role.
+                if cloudKitSyncEngine.pairingState == .paired {
+                    Color.clear.task { advance() }
+                } else {
+                    PartnerInviteView(cloudKitSyncEngine: cloudKitSyncEngine, state: onboardingState, onFinished: advance, onBack: goBack)
+                }
             case .notifications:
                 NotificationsStepView(onContinue: advance, onBack: goBack)
             case .unlock:

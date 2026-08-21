@@ -66,8 +66,8 @@ struct PartnerInviteView: View {
 
             VStack(spacing: 14) {
                 OnboardingCTAButton(
-                    title: isCreatingRoom ? "Creating Room…" : "Invite Your Partner",
-                    isLoading: isCreatingRoom,
+                    title: buttonTitle,
+                    isLoading: isCreatingRoom || cloudKitSyncEngine.pairingState == .pairing,
                     action: createAndInvite
                 )
 
@@ -87,6 +87,26 @@ struct PartnerInviteView: View {
                 .ignoresSafeArea()
             }
         }
+        // A share accepted via the system sheet just before this app UI appeared can still be
+        // resolving in the background while this screen is showing. Advance automatically once
+        // it lands — but only for a genuine incoming accept (role flips to .partner), never for
+        // this device's own room creation (role .owner), which already advances explicitly via
+        // the share-sheet's onDismiss above and must not be double-triggered here.
+        .onChange(of: cloudKitSyncEngine.pairingState) { _, newState in
+            if newState == .paired, cloudKitSyncEngine.role == .partner {
+                onFinished()
+            }
+        }
+    }
+
+    /// While a just-accepted share is still resolving in the background, the button is
+    /// disabled with this label instead of "Invite Your Partner" — tapping it now would create
+    /// a second, unrelated room for someone who's actually about to join an existing one.
+    private var buttonTitle: String {
+        if cloudKitSyncEngine.pairingState == .pairing {
+            return "Checking your invite…"
+        }
+        return isCreatingRoom ? "Creating Room…" : "Invite Your Partner"
     }
 
     private var header: some View {
