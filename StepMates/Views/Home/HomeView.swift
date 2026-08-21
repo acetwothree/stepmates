@@ -87,6 +87,12 @@ struct HomeView: View {
                     PendingWagerBanner(wager: awaiting, pair: viewModel.pair) { accepted in
                         viewModel.respondToWagerProposal(accept: accepted)
                     }
+                } else if let wager = viewModel.activeWager {
+                    // Once this device is no longer the one being asked to respond (either
+                    // it's fully agreed and active, or this device proposed it and is waiting
+                    // on the partner), the pending banner above disappears — without this,
+                    // nothing on Home ever showed the wager existed at all, agreed or not.
+                    WagerCard(wager: wager)
                 }
 
                 StepArenaView(pair: viewModel.pair, comparison: viewModel.comparison)
@@ -98,6 +104,7 @@ struct HomeView: View {
             .padding(20)
             .animation(.spring(response: 0.5, dampingFraction: 0.85), value: viewModel.healthKitManager.authorizationStatus)
             .animation(.spring(response: 0.5, dampingFraction: 0.85), value: viewModel.cloudKitSyncEngine.partnerSnapshot)
+            .animation(.spring(response: 0.5, dampingFraction: 0.85), value: viewModel.activeWager)
         }
         .background(SweatmatesColors.background.ignoresSafeArea())
         .sheet(isPresented: $viewModel.showStats) {

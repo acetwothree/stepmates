@@ -24,12 +24,13 @@ struct MenuOverlay<Content: View>: View {
                             isPresented = false
                         }
 
-                    // No .ignoresSafeArea() on content() itself — that was pulling its whole
-                    // layout (including the profile row) up under the status bar / Dynamic
-                    // Island, not just its background. MenuDrawerView bleeds its own
-                    // background to the edges internally while keeping its content laid out
-                    // normally; ignoring safe area up here on the GeometryReader instead just
-                    // gives it the full physical size to work with.
+                    // content() deliberately stays inside the safe area here — MenuDrawerView
+                    // bleeds its own background to the physical edges internally, but its
+                    // layout (profile row, menu rows, etc.) needs proxy.size to reflect the
+                    // safe-area-respecting height. Applying .ignoresSafeArea() up at this
+                    // GeometryReader level (as this used to do) hands content() the full
+                    // physical screen size instead, which is what was pushing the profile row
+                    // up under the status bar / Dynamic Island despite its own top padding.
                     content()
                         .frame(width: proxy.size.width * 0.82, height: proxy.size.height)
                         .shadow(color: .black.opacity(0.25), radius: 24, x: 8, y: 0)
@@ -37,7 +38,6 @@ struct MenuOverlay<Content: View>: View {
                 }
             }
         }
-        .ignoresSafeArea()
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isPresented)
     }
 }

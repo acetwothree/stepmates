@@ -12,6 +12,7 @@ import SwiftUI
 struct RootView: View {
     @State private var healthKitManager = HealthKitManager.shared
     @State private var cloudKitSyncEngine = CloudKitSyncEngine.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Decided once, synchronously, from whatever state each singleton already has at
     /// launch (CloudKitSyncEngine restores persisted pairing synchronously in its own
@@ -44,6 +45,17 @@ struct RootView: View {
                healthKitManager.authorizationStatus != .notDetermined,
                cloudKitSyncEngine.pairingState != .unpaired {
                 flow.isOnboarding = false
+            }
+        }
+        // The one-shot .task above only ever runs once per app process — a partner's display
+        // name change (or any other CloudKit update) picked up by push notification is
+        // best-effort and not guaranteed prompt, so without this, returning to an
+        // already-running app (not a true cold relaunch) can show stale partner data
+        // indefinitely. Silent pushes stay as the fast path; this is the reliable fallback.
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task {
+                await cloudKitSyncEngine.refreshFromCloud()
             }
         }
     }
