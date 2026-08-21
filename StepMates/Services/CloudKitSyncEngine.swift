@@ -79,9 +79,57 @@ final class CloudKitSyncEngine {
     /// Re-arms subscriptions and pulls fresh state on every launch, mirroring
     /// `HealthKitManager.bootstrapIfAuthorized()` — a no-op until a room actually exists.
     func bootstrap() async {
-        guard pairingState == .paired else { return }
+        guard pairingState == .paired else {
+            await discoverExistingSharedZoneIfNeeded()
+            return
+        }
         setupDatabaseSubscriptions()
         await refreshFromCloud()
+    }
+
+    /// Recovery path for a device that's already an *accepted* CKShare participant at the
+    /// CloudKit server (the system share sheet's Accept tap registers that directly with
+    /// CloudKit, independent of this app) but has no local record of it — a reinstall, or a
+    /// prior launch where `acceptShare` never completed. `userDidAcceptCloudKitShareWith` only
+    /// fires for the live accept event itself, never again afterward, so without this a
+    /// reinstalled partner would stay stuck in onboarding forever with nothing to bind to.
+    /// Apple's own guidance for this exact gap is to enumerate the shared database's zones —
+    /// see the "Get the most out of CloudKit Sharing" WWDC session.
+    private func discoverExistingSharedZoneIfNeeded() async {
+        do {
+            let zones = try await sharedDatabase.allRecordZones()
+            guard let zone = zones.first(where: { $0.zoneID.zoneName == Self.zoneName }) else { return }
+
+            zoneID = zone.zoneID
+            role = .partner
+            cachedMemberRecord = nil
+
+            let record = try await loadOrCreateMemberRecord()
+            let userRecordID = try await container.userRecordID()
+            record[MemberField.userRecordID] = userRecordID.recordName as CKRecordValue
+            if record[MemberField.displayName] == nil {
+                record[MemberField.displayName] = "Your Step Partner" as CKRecordValue
+                record[MemberField.currentSteps] = 0 as CKRecordValue
+                record[MemberField.todayDistance] = 0.0 as CKRecordValue
+                record[MemberField.todayActiveCalories] = 0.0 as CKRecordValue
+                record[MemberField.todayFlightsClimbed] = 0 as CKRecordValue
+                record[MemberField.todayActiveMinutes] = 0 as CKRecordValue
+            }
+            record[MemberField.lastSyncedAt] = Date.now as CKRecordValue
+
+            let saved = try await activeDatabase.save(record)
+            cachedMemberRecord = saved
+            mySnapshot = MemberSnapshot(record: saved)
+
+            pairingState = .paired
+            persistPairingState()
+            setupDatabaseSubscriptions()
+            await refreshFromCloud()
+        } catch {
+            zoneID = nil
+            role = nil
+            cachedMemberRecord = nil
+        }
     }
 
     // MARK: Room creation & sharing
