@@ -48,7 +48,7 @@ struct OnboardingFlowView: View {
                 // — the system-level accept sheet (shown before this app UI ever appeared)
                 // already paired them. Without this check every partner would land on the
                 // owner-facing "Invite Your Partner" screen regardless of role.
-                if cloudKitSyncEngine.pairingState == .paired {
+                if cloudKitSyncEngine.pairingState == .paired, cloudKitSyncEngine.role == .partner {
                     Color.clear.task { advance() }
                 } else {
                     PartnerInviteView(cloudKitSyncEngine: cloudKitSyncEngine, state: onboardingState, onFinished: advance, onBack: goBack)
